@@ -1,0 +1,18 @@
+server:
+  port: 8765
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: reporting-service-route
+          uri: lb://REPORTING-SERVICE
+          predicates:
+            - Path=/api/reports/**, /api/kpis/**, /api/audit-packages/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/

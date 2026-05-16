@@ -1,0 +1,57 @@
+server:
+  port: 8083
+
+app:
+  jwt:
+    secret: 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007
+
+spring:
+  application:
+    name: guest-reservation-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/guest_reservation_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    open-in-view: false
+
+  sql:
+    init:
+      mode: never
+
+  cloud:
+    openfeign:
+      okhttp:
+        enabled: true
+
+# Room Service URL fallback (used by Feign if Eureka can't resolve)
+room-service:
+  url: http://localhost:8082
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

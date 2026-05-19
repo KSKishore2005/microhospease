@@ -3,6 +3,11 @@ C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservic
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\dto\RoomDto.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\dto\ServiceOrderDto.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\dto\UserDto.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\fallback\FinanceClientFallback.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\fallback\ReservationClientFallback.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\fallback\RoomServiceClientFallback.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\fallback\ServiceOrderClientFallback.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\fallback\UserServiceClientFallback.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\FinanceClient.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\ReservationClient.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\reporting-service\src\main\java\com\cognizant\hospease\client\RoomServiceClient.java

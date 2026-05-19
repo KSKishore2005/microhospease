@@ -9,6 +9,9 @@ spring:
   application:
     name: finance-service
 
+  config:
+    import: "optional:configserver:http://localhost:8888"
+
   datasource:
     url: jdbc:mysql://localhost:3306/finance_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root

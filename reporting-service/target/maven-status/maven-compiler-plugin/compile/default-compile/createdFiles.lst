@@ -14,6 +14,7 @@ com\cognizant\hospease\service\ReportContentGeneratorService.class
 com\cognizant\hospease\service\ReportService.class
 com\cognizant\hospease\dto\AuditPackageRequestDto$AuditPackageRequestDtoBuilder.class
 com\cognizant\hospease\client\FinanceClient.class
+com\cognizant\hospease\client\fallback\UserServiceClientFallback.class
 com\cognizant\hospease\common\exception\ErrorResponse.class
 com\cognizant\hospease\controller\AuditPackageController.class
 com\cognizant\hospease\controller\KPIController.class
@@ -29,10 +30,13 @@ com\cognizant\hospease\controller\ReportController.class
 com\cognizant\hospease\entity\KPI$KPIBuilder.class
 com\cognizant\hospease\common\exception\GlobalExceptionHandler.class
 com\cognizant\hospease\dto\KPIResponseDto.class
+com\cognizant\hospease\client\fallback\ReservationClientFallback.class
+com\cognizant\hospease\client\fallback\ServiceOrderClientFallback.class
 com\cognizant\hospease\repository\AuditPackageRepository.class
 com\cognizant\hospease\client\dto\RoomDto.class
 com\cognizant\hospease\common\exception\ResourceNotFoundException.class
 com\cognizant\hospease\security\JwtUtil.class
+com\cognizant\hospease\client\fallback\RoomServiceClientFallback.class
 com\cognizant\hospease\dto\KPIRequestDto.class
 com\cognizant\hospease\security\RbacSecurityConfig.class
 com\cognizant\hospease\common\exception\ErrorResponse$ErrorResponseBuilder.class
@@ -47,6 +51,7 @@ com\cognizant\hospease\client\UserServiceClient.class
 com\cognizant\hospease\dto\AuditPackageResponseDto.class
 com\cognizant\hospease\security\LocalSecurityConfig.class
 com\cognizant\hospease\service\PdfGeneratorService.class
+com\cognizant\hospease\client\fallback\FinanceClientFallback.class
 com\cognizant\hospease\dto\AuditPackageRequestDto.class
 com\cognizant\hospease\common\exception\BadRequestException.class
 com\cognizant\hospease\client\dto\ServiceOrderDto.class

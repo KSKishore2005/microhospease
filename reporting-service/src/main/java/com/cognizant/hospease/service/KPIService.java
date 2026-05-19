@@ -10,6 +10,7 @@ import com.cognizant.hospease.dto.KPIRequestDto;
 import com.cognizant.hospease.dto.KPIResponseDto;
 import com.cognizant.hospease.entity.KPI;
 import com.cognizant.hospease.repository.KPIRepository;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -71,6 +72,7 @@ public class KPIService {
      * Calculates occupancy rate from room-service data:
      * occupiedRooms / totalRooms * 100
      */
+    @RateLimiter(name = "kpiCalculation", fallbackMethod = "kpiRateLimitFallback")
     public KPIResponseDto calculateOccupancyRate(Long kpiId) {
         KPI kpi = findEntityById(kpiId);
         try {
@@ -101,6 +103,7 @@ public class KPIService {
     /**
      * Calculates total paid revenue from finance-service.
      */
+    @RateLimiter(name = "kpiCalculation", fallbackMethod = "kpiRateLimitFallback")
     public KPIResponseDto calculateRevenue(Long kpiId) {
         KPI kpi = findEntityById(kpiId);
         try {
@@ -125,6 +128,7 @@ public class KPIService {
     /**
      * Calculates payment collection rate: PAID / (PAID + UNPAID + OVERDUE) * 100
      */
+    @RateLimiter(name = "kpiCalculation", fallbackMethod = "kpiRateLimitFallback")
     public KPIResponseDto calculatePaymentCollectionRate(Long kpiId) {
         KPI kpi = findEntityById(kpiId);
         try {
@@ -155,6 +159,13 @@ public class KPIService {
 
     public void deleteKPI(Long id) {
         kpiRepository.delete(findEntityById(id));
+    }
+
+    // ─── Rate Limiter Fallback ────────────────────────────────────────────────────
+
+    public KPIResponseDto kpiRateLimitFallback(Long kpiId, Throwable t) {
+        log.warn("[RATE-LIMIT] KPI calculation rate limit exceeded for kpiId={}: {}", kpiId, t.getMessage());
+        throw new RuntimeException("Too many KPI calculation requests. Please try again shortly.");
     }
 
     private KPI findEntityById(Long id) {

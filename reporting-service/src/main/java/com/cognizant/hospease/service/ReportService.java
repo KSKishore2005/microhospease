@@ -11,6 +11,7 @@ import com.cognizant.hospease.entity.Report;
 import com.cognizant.hospease.enums.ReportScope;
 import com.cognizant.hospease.repository.ReportRepository;
 import feign.FeignException;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ public class ReportService {
                 .map(this::enrich).toList();
     }
 
+    @RateLimiter(name = "reportGeneration", fallbackMethod = "createReportFallback")
     public ReportResponseDto createReport(ReportRequestDto dto) {
         log.info("Creating report '{}' by staffId={}", dto.getReportType(), dto.getGeneratedByStaffId());
 
@@ -83,6 +85,7 @@ public class ReportService {
         return DtoMapper.toReportResponseDto(saved, staff);
     }
 
+    @RateLimiter(name = "reportGeneration", fallbackMethod = "updateReportFallback")
     public ReportResponseDto updateReport(Long id, ReportRequestDto dto) {
         Report existing = findEntityById(id);
 
@@ -153,6 +156,18 @@ public class ReportService {
                     report.getReportId(), e.getMessage());
             return null;
         }
+    }
+
+    // ─── Rate Limiter Fallback Methods ───────────────────────────────────────────
+
+    public ReportResponseDto createReportFallback(ReportRequestDto dto, Throwable t) {
+        log.warn("[RATE-LIMIT] createReport rate limit exceeded: {}", t.getMessage());
+        throw new RuntimeException("Too many report generation requests. Please try again shortly.");
+    }
+
+    public ReportResponseDto updateReportFallback(Long id, ReportRequestDto dto, Throwable t) {
+        log.warn("[RATE-LIMIT] updateReport rate limit exceeded: {}", t.getMessage());
+        throw new RuntimeException("Too many report update requests. Please try again shortly.");
     }
 
     /** Enriches with staff data; tolerates upstream failures. */

@@ -7,6 +7,7 @@ export interface GuestResponseDto {
   phone: string;
   dob: string;
   loyaltyTier: string;   // BRONZE, SILVER, GOLD, PLATINUM
+  loyaltyPoints?: number;
   status: string;        // ACTIVE, INACTIVE, BLACKLISTED
   addressLine1: string;
   addressLine2: string;

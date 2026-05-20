@@ -40,7 +40,7 @@ export default function RegisterPage() {
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
     if (form.password !== form.confirmPassword) { setError('Passwords do not match.'); return; }
     setLoading(true);
-    const result = await register(form.name.trim(), form.email.trim(), form.phone.trim() || undefined, form.password);
+    const result = await register(form.name.trim(), form.email.trim(), form.phone.trim(), form.password);
     setLoading(false);
     if (result.success) navigate('/guest', { replace: true });
     else setError(result.error ?? 'Registration failed. Please try again.');

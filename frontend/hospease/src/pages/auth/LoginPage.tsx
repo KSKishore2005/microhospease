@@ -1,18 +1,18 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
-import { Building2, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Building2, Eye, EyeOff, ArrowRight, Zap, Shield, BarChart3, Users } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import Button from '../../components/common/Button';
 
+/* ─── Demo accounts ───────────────────────────────────────── */
 const DEMO_ACCOUNTS = [
-  { role: 'Admin',         email: 'admin@hospease.com',        password: 'Admin@123',   color: 'text-purple-600 bg-purple-50  hover:bg-purple-100  ring-purple-200'  },
-  { role: 'Manager',       email: 'manager@hospease.com',      password: 'Manager@123', color: 'text-blue-600   bg-blue-50    hover:bg-blue-100    ring-blue-200'    },
-  { role: 'Front Desk',    email: 'frontdesk@hospease.com',    password: 'Staff@123',   color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100 ring-emerald-200' },
-  { role: 'Housekeeping',  email: 'housekeeping@hospease.com', password: 'Staff@123',   color: 'text-amber-600  bg-amber-50   hover:bg-amber-100   ring-amber-200'   },
-  { role: 'Service Staff', email: 'service@hospease.com',      password: 'Staff@123',   color: 'text-orange-600 bg-orange-50  hover:bg-orange-100  ring-orange-200'  },
-  { role: 'Finance',       email: 'finance@hospease.com',      password: 'Staff@123',   color: 'text-teal-600   bg-teal-50    hover:bg-teal-100    ring-teal-200'    },
-  { role: 'Auditor',       email: 'auditor@hospease.com',      password: 'Staff@123',   color: 'text-indigo-600 bg-indigo-50  hover:bg-indigo-100  ring-indigo-200'  },
-  { role: 'Guest',         email: 'guest@hospease.com',        password: 'Guest@123',   color: 'text-gold-600   bg-gold-50    hover:bg-gold-100    ring-gold-200'    },
+  { role: 'Admin',         emoji: '👑', email: 'admin@hospease.com',        password: 'Admin@123'   },
+  { role: 'Manager',       emoji: '📊', email: 'manager@hospease.com',      password: 'Manager@123' },
+  { role: 'Front Desk',    emoji: '🛎️', email: 'frontdesk@hospease.com',    password: 'Staff@123'   },
+  { role: 'Housekeeping',  emoji: '🧹', email: 'housekeeping@hospease.com', password: 'Staff@123'   },
+  { role: 'Service Staff', emoji: '🍽️', email: 'service@hospease.com',      password: 'Staff@123'   },
+  { role: 'Finance',       emoji: '💰', email: 'finance@hospease.com',      password: 'Staff@123'   },
+  { role: 'Auditor',       emoji: '📋', email: 'auditor@hospease.com',      password: 'Staff@123'   },
+  { role: 'Guest',         emoji: '🛏️', email: 'guest@hospease.com',        password: 'Guest@123'   },
 ];
 
 const roleRedirects: Record<string, string> = {
@@ -21,21 +21,26 @@ const roleRedirects: Record<string, string> = {
   FINANCE: '/finance', REPORTING: '/reporting', GUEST: '/guest',
 };
 
-const stats = [
-  { value: '500+', label: 'Rooms Managed' },
-  { value: '12K+', label: 'Guests Served' },
-  { value: '98%',  label: 'Satisfaction' },
-  { value: '24/7', label: 'Support' },
+/* ─── Floating feature cards ──────────────────────────────── */
+const features = [
+  { icon: <Zap size={16} />,      title: 'Real-time Updates',    desc: 'Live room & booking status' },
+  { icon: <Shield size={16} />,   title: 'Role-Based Access',    desc: 'Granular permissions' },
+  { icon: <BarChart3 size={16} />, title: 'Smart Analytics',     desc: 'KPIs & revenue insights' },
+  { icon: <Users size={16} />,    title: 'Guest Management',     desc: 'Loyalty & preferences' },
 ];
 
 export default function LoginPage() {
   const { login, isAuthenticated, user } = useAuthStore();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error, setError]               = useState('');
+  const [loading, setLoading]           = useState(false);
+  const [activeDemo, setActiveDemo]     = useState<string | null>(null);
+  const [mounted, setMounted]           = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   if (isAuthenticated && user) {
     return <Navigate to={roleRedirects[user.role] ?? '/guest'} replace />;
@@ -56,12 +61,14 @@ export default function LoginPage() {
   };
 
   const quickLogin = async (acc: (typeof DEMO_ACCOUNTS)[0]) => {
+    setActiveDemo(acc.email);
     setEmail(acc.email);
     setPassword(acc.password);
     setError('');
     setLoading(true);
     const result = await login(acc.email, acc.password);
     setLoading(false);
+    setActiveDemo(null);
     if (result.success) {
       const u = useAuthStore.getState().user;
       navigate(roleRedirects[u?.role ?? ''] ?? '/guest');
@@ -71,160 +78,238 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex bg-white">
-      {/* ── Left branding panel ─────────────────────────── */}
-      <div className="hidden lg:flex lg:w-[55%] relative overflow-hidden bg-navy-950 flex-col">
-        {/* Background decoration */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-navy-800/40 blur-3xl" />
-          <div className="absolute top-1/2 -right-40 w-[500px] h-[500px] rounded-full bg-gold-500/8 blur-3xl" />
-          <div className="absolute -bottom-24 left-1/4 w-80 h-80 rounded-full bg-navy-700/50 blur-3xl" />
-          {/* Grid pattern */}
-          <svg className="absolute inset-0 opacity-[0.04]" width="100%" height="100%">
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="1"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
+    <div className="min-h-screen flex overflow-hidden">
+      {/* ═══════════════════════════════════════════════════════
+          LEFT PANEL  — dark cinematic branding
+      ════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:flex lg:w-[52%] relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a0f1e 0%, #0d1630 40%, #0f1f3d 70%, #0a1628 100%)' }}>
+
+        {/* Animated glowing orbs */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full opacity-20 blur-3xl animate-pulse" style={{ background: 'radial-gradient(circle, #c9a227 0%, transparent 70%)' }} />
+          <div className="absolute top-1/2 -right-32 w-[400px] h-[400px] rounded-full opacity-10 blur-3xl animate-pulse" style={{ background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)', animationDelay: '1s' }} />
+          <div className="absolute -bottom-40 left-1/3 w-[450px] h-[450px] rounded-full opacity-15 blur-3xl animate-pulse" style={{ background: 'radial-gradient(circle, #7c3aed 0%, transparent 70%)', animationDelay: '2s' }} />
         </div>
 
-        <div className="relative flex flex-col justify-between h-full p-12">
+        {/* Dot grid overlay */}
+        <div className="absolute inset-0 opacity-[0.07]" style={{ backgroundImage: 'radial-gradient(circle, #ffffff 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+
+        {/* Diagonal accent line */}
+        <div className="absolute top-0 right-0 w-px h-full opacity-10" style={{ background: 'linear-gradient(to bottom, transparent 0%, #c9a227 40%, transparent 100%)' }} />
+
+        <div className="relative flex flex-col justify-between h-full p-12 z-10">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-gradient-to-br from-gold-400 to-gold-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Building2 size={20} className="text-white" />
+          <div className={`flex items-center gap-3 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+            <div className="relative">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl" style={{ background: 'linear-gradient(135deg, #c9a227, #f0c040)' }}>
+                <Building2 size={22} className="text-white drop-shadow" />
+              </div>
+              <div className="absolute -inset-1 rounded-2xl blur-sm opacity-40" style={{ background: 'linear-gradient(135deg, #c9a227, #f0c040)' }} />
             </div>
             <div>
-              <p className="text-white font-bold text-xl">HospEase</p>
-              <p className="text-gold-400 text-xs font-medium">Hospitality Management Suite</p>
+              <p className="text-white font-bold text-xl tracking-tight">HospEase</p>
+              <p className="text-xs font-medium" style={{ color: '#c9a227' }}>Hospitality Management Suite</p>
             </div>
           </div>
 
-          {/* Main copy */}
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gold-500/15 border border-gold-500/20 mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-gold-400 animate-pulse" />
-              <span className="text-gold-300 text-xs font-medium">Enterprise Grade Platform</span>
+          {/* Main content */}
+          <div className={`transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-8" style={{ borderColor: 'rgba(201,162,39,0.3)', background: 'rgba(201,162,39,0.08)' }}>
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#c9a227' }} />
+              <span className="text-xs font-semibold" style={{ color: '#c9a227' }}>Enterprise-Grade Platform</span>
             </div>
 
-            <h1 className="text-5xl font-bold text-white leading-tight tracking-tight">
-              Premium<br />
-              <span className="text-gradient-gold">Hospitality</span><br />
-              Management
+            <h1 className="text-5xl xl:text-6xl font-bold text-white leading-[1.1] tracking-tight">
+              Elevate Your<br />
+              <span style={{ background: 'linear-gradient(90deg, #c9a227 0%, #f0c040 50%, #c9a227 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                Hospitality
+              </span>
             </h1>
-            <p className="text-gray-400 mt-5 text-base leading-relaxed max-w-sm">
-              Streamline operations, delight every guest, and maximize revenue with our all-in-one hotel management platform.
+            <p className="text-gray-400 mt-5 text-base leading-relaxed max-w-xs">
+              One unified platform to manage rooms, guests, staff, and revenue — from check-in to check-out.
             </p>
 
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-4 mt-10">
-              {stats.map((s) => (
-                <div key={s.label} className="text-center p-3 rounded-xl bg-white/5 border border-white/8">
-                  <p className="text-gold-400 text-2xl font-bold leading-none">{s.value}</p>
-                  <p className="text-gray-500 text-xs mt-1.5 leading-tight">{s.label}</p>
+            {/* Feature cards */}
+            <div className="grid grid-cols-2 gap-3 mt-10">
+              {features.map((f, i) => (
+                <div
+                  key={f.title}
+                  className={`p-4 rounded-2xl border transition-all duration-700 hover:scale-105 cursor-default`}
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    borderColor: 'rgba(255,255,255,0.08)',
+                    backdropFilter: 'blur(10px)',
+                    transitionDelay: `${300 + i * 80}ms`,
+                    opacity: mounted ? 1 : 0,
+                    transform: mounted ? 'translateY(0)' : 'translateY(16px)',
+                  }}
+                >
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2.5" style={{ background: 'rgba(201,162,39,0.15)', color: '#c9a227' }}>
+                    {f.icon}
+                  </div>
+                  <p className="text-white text-xs font-semibold">{f.title}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">{f.desc}</p>
                 </div>
               ))}
             </div>
 
-            {/* Feature list */}
-            <div className="mt-8 space-y-2.5">
-              {[
-                'Multi-role access control',
-                'Real-time room & housekeeping management',
-                'Integrated billing & payments',
-                'Advanced analytics & KPI tracking',
-              ].map((f) => (
-                <div key={f} className="flex items-center gap-3 text-sm text-gray-300">
-                  <span className="w-5 h-5 rounded-full bg-gold-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gold-400" />
-                  </span>
-                  {f}
+            {/* Stats */}
+            <div className="flex items-center gap-6 mt-8 pt-8 border-t border-white/8">
+              {[['500+', 'Rooms'], ['12K+', 'Guests'], ['98%', 'Satisfaction']].map(([val, lbl]) => (
+                <div key={lbl}>
+                  <p className="text-2xl font-bold" style={{ color: '#c9a227' }}>{val}</p>
+                  <p className="text-gray-500 text-xs">{lbl}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <p className="text-gray-600 text-xs">&copy; 2026 HospEase. All rights reserved.</p>
+          <p className="text-gray-700 text-xs">© 2026 HospEase. All rights reserved.</p>
         </div>
       </div>
 
-      {/* ── Right form panel ─────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-gray-50 overflow-y-auto">
-        <div className="w-full max-w-sm">
+      {/* ═══════════════════════════════════════════════════════
+          RIGHT PANEL  — form
+      ════════════════════════════════════════════════════════ */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12 overflow-y-auto" style={{ background: '#f8fafc' }}>
+        <div className={`w-full max-w-md transition-all duration-700 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            <div className="w-9 h-9 bg-navy-900 rounded-xl flex items-center justify-center">
-              <Building2 size={16} className="text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0a0f1e, #1a2744)' }}>
+              <Building2 size={18} className="text-white" />
             </div>
-            <span className="font-bold text-navy-900 text-lg">HospEase</span>
+            <span className="font-bold text-gray-900 text-xl">HospEase</span>
           </div>
 
-          <div className="mb-7">
-            <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
-            <p className="text-gray-500 text-sm mt-1.5">
+          {/* Header */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Welcome back</h2>
+            <p className="text-gray-500 text-sm mt-2">
               Sign in to your portal, or{' '}
-              <Link to="/register" className="text-navy-700 font-semibold hover:underline">create a guest account</Link>
+              <Link to="/register" className="font-semibold hover:underline" style={{ color: '#1a2744' }}>
+                create a guest account
+              </Link>
             </p>
           </div>
 
+          {/* Error */}
           {error && (
-            <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm flex items-start gap-2.5">
-              <span className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center text-white text-xs flex-shrink-0 mt-0.5">!</span>
-              {error}
+            <div className="mb-5 p-4 rounded-2xl border flex items-start gap-3 animate-fade-in-right" style={{ background: '#fff5f5', borderColor: '#fecaca' }}>
+              <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-white text-xs font-bold">!</span>
+              </div>
+              <p className="text-red-700 text-sm font-medium">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="input-label">Email address</label>
-              <input
-                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@hospease.com" required
-                className="input"
-              />
-            </div>
-            <div>
-              <label className="input-label">Password</label>
-              <div className="relative">
+          {/* Form card */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-7 mb-6">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
                 <input
-                  type={showPassword ? 'text' : 'password'} value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••" required
-                  className="input pr-11"
+                  type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@hospease.com" required
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none transition-all bg-gray-50 hover:bg-white"
+                  onFocus={(e) => { e.target.style.boxShadow = '0 0 0 3px rgba(201,162,39,0.15)'; e.target.style.borderColor = '#c9a227'; e.target.style.background = '#fff'; }}
+                  onBlur={(e) => { e.target.style.boxShadow = ''; e.target.style.borderColor = '#e5e7eb'; e.target.style.background = '#f9fafb'; }}
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
               </div>
-            </div>
-            <Button type="submit" className="w-full justify-center" size="lg" loading={loading} icon={<ArrowRight size={16} />}>
-              {loading ? 'Signing in…' : 'Sign In'}
-            </Button>
-          </form>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-semibold text-gray-700">Password</label>
+                  <button type="button" className="text-xs font-medium hover:underline" style={{ color: '#1a2744' }}>Forgot password?</button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'} value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••" required
+                    className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-200 text-sm focus:outline-none transition-all bg-gray-50 hover:bg-white"
+                    onFocus={(e) => { e.target.style.boxShadow = '0 0 0 3px rgba(201,162,39,0.15)'; e.target.style.borderColor = '#c9a227'; e.target.style.background = '#fff'; }}
+                    onBlur={(e) => { e.target.style.boxShadow = ''; e.target.style.borderColor = '#e5e7eb'; e.target.style.background = '#f9fafb'; }}
+                  />
+                  <button
+                    type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+              </div>
 
-          {/* Demo quick login */}
-          <div className="mt-7">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Quick Demo Login</span>
-              <div className="flex-1 h-px bg-gray-200" />
+              <button
+                type="submit" disabled={loading}
+                className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-xl font-semibold text-white text-sm transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed hover:scale-[1.02] hover:shadow-lg active:scale-[0.99]"
+                style={{ background: loading ? '#1a2744' : 'linear-gradient(135deg, #0a0f1e 0%, #1a2744 100%)', boxShadow: loading ? '' : '0 4px 24px rgba(10,15,30,0.25)' }}
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Signing in…
+                  </>
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {/* Demo Quick Login */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1 h-px bg-gray-100" />
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Quick Demo</span>
+              </div>
+              <div className="flex-1 h-px bg-gray-100" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  key={acc.email}
-                  onClick={() => quickLogin(acc)}
-                  disabled={loading}
-                  className={`text-left px-3 py-2 rounded-xl text-xs font-semibold ring-1 transition-all duration-150 ${acc.color}`}
-                >
-                  {acc.role}
-                </button>
-              ))}
+              {DEMO_ACCOUNTS.map((acc) => {
+                const isActive = activeDemo === acc.email;
+                return (
+                  <button
+                    key={acc.email}
+                    onClick={() => quickLogin(acc)}
+                    disabled={loading}
+                    className="relative flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left text-xs font-semibold transition-all duration-200 border hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden group"
+                    style={{
+                      background: isActive ? '#f0f4ff' : '#fafafa',
+                      borderColor: isActive ? '#c7d2fe' : '#e5e7eb',
+                      color: '#374151',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f4ff'; e.currentTarget.style.borderColor = '#a5b4fc'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? '#f0f4ff' : '#fafafa'; e.currentTarget.style.borderColor = isActive ? '#c7d2fe' : '#e5e7eb'; }}
+                  >
+                    {/* Shimmer on active */}
+                    {isActive && (
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_0.8s_infinite]" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent)' }} />
+                    )}
+                    <span className="text-base flex-shrink-0">{acc.emoji}</span>
+                    <span className="truncate">{acc.role}</span>
+                    {isActive && (
+                      <svg className="animate-spin w-3 h-3 ml-auto flex-shrink-0 text-indigo-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
             </div>
+            <p className="text-xs text-gray-400 text-center mt-3">Click any role to instantly demo that portal</p>
           </div>
+
+          <p className="text-center text-xs text-gray-400 mt-6">© 2026 HospEase · All rights reserved</p>
         </div>
       </div>
     </div>

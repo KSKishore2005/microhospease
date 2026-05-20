@@ -7,7 +7,7 @@ import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { serviceOrdersApi } from '../../api/serviceOrders';
-import type { ServiceOrderResponseDto } from '../../api/serviceOrders';
+import type { ServiceOrderResponseDto, ServiceOrderStatus } from '../../api/serviceOrders';
 import { formatRelative, formatDate } from '../../utils/formatters';
 
 const priorityConfig: Record<string, { icon: string; label: string; badge: string }> = {
@@ -38,7 +38,7 @@ export default function MaintenanceRequests() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => serviceOrdersApi.updateStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: ServiceOrderStatus }) => serviceOrdersApi.updateStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['service-orders', 'MAINTENANCE'] }),
   });
 

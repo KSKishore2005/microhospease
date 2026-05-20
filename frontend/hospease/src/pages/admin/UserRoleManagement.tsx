@@ -7,8 +7,8 @@ import Badge from '../../components/common/Badge';
 import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
-import { usersApi } from '../../api/users';
-import { formatDate } from '../../utils/formatters';
+import { usersApi, type UserResponseDTO } from '../../api/users';
+import { useToastStore } from '../../store/toastStore';
 
 const BACKEND_ROLE_LABELS: Record<string, string> = {
   ADMINISTRATOR:              'Administrator',
@@ -51,8 +51,12 @@ function roleColor(r: string) { return BACKEND_ROLE_COLORS[r] ?? 'bg-gray-100 te
 export default function UserRoleManagement() {
   const [activeTab, setActiveTab] = useState<'USERS' | 'RBAC'>('USERS');
   const [showAdd, setShowAdd] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserResponseDTO | null>(null);
+  
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: '' });
-
+  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', role: '', status: '' });
+  
+  const addToast = useToastStore((s) => s.addToast);
   const queryClient = useQueryClient();
 
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: usersApi.getAll });
@@ -68,12 +72,26 @@ export default function UserRoleManagement() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setShowAdd(false);
       setForm({ name: '', email: '', phone: '', password: '', role: '' });
+      addToast('User created successfully!', 'success');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Parameters<typeof usersApi.update>[1] }) =>
+      usersApi.update(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setEditingUser(null);
+      addToast('User updated successfully!', 'success');
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => usersApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      addToast('User deleted successfully!', 'success');
+    },
   });
 
   const columns = [
@@ -84,7 +102,7 @@ export default function UserRoleManagement() {
       render: (v: unknown) => {
         const role = String(v ?? '');
         return (
-          <span className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${roleColor(role)}`}>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${roleColor(role)}`}>
             {roleLabel(role)}
           </span>
         );
@@ -100,10 +118,21 @@ export default function UserRoleManagement() {
       key: 'userId', label: 'Actions',
       render: (_v: unknown, row: Record<string, unknown>) => (
         <div className="flex gap-1">
-          <Button size="xs" variant="ghost" icon={<Edit size={12} />}>Edit</Button>
+          <Button size="xs" variant="ghost" icon={<Edit size={12} />}
+            onClick={() => {
+              const u = row as unknown as UserResponseDTO;
+              setEditingUser(u);
+              setEditForm({ name: u.name, email: u.email, phone: u.phone, role: u.role, status: u.status });
+            }}>
+            Edit
+          </Button>
           <Button size="xs" variant="ghost" icon={<Trash2 size={12} />}
             className="text-rose-500 hover:text-rose-700 hover:bg-rose-50"
-            onClick={() => deleteMutation.mutate(String(row['userId']))}>
+            onClick={() => {
+              if (window.confirm(`Are you sure you want to remove user "${row['name']}"?`)) {
+                deleteMutation.mutate(String(row['userId']));
+              }
+            }}>
             Remove
           </Button>
         </div>
@@ -122,7 +151,22 @@ export default function UserRoleManagement() {
     });
   };
 
+  const handleUpdate = () => {
+    if (!editingUser) return;
+    updateMutation.mutate({
+      id: editingUser.userId,
+      payload: {
+        name: editForm.name,
+        email: editForm.email,
+        phone: editForm.phone,
+        role: editForm.role,
+        status: editForm.status,
+      },
+    });
+  };
+
   const isFormValid = form.name && form.email && form.phone && form.role && form.password;
+  const isEditFormValid = editForm.name && editForm.email && editForm.phone && editForm.role && editForm.status;
 
   return (
     <div className="space-y-6">
@@ -141,7 +185,7 @@ export default function UserRoleManagement() {
           { label: 'Active',       value: users.filter((u) => String(u.status) === 'ACTIVE').length, bg: 'from-emerald-500 to-teal-600', icon: <CheckCircle2 size={18} /> },
           { label: 'Roles Defined', value: backendRoles.length,                                       bg: 'from-purple-500 to-purple-700', icon: <Shield size={18} /> },
         ].map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 animate-fade-in-up">
             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.bg} flex items-center justify-center text-white shadow-md flex-shrink-0`}>
               {s.icon}
             </div>
@@ -200,14 +244,12 @@ export default function UserRoleManagement() {
         </Card>
       )}
 
+      {/* Add User Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add New User" subtitle="Create a new staff account" size="md"
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button
-              onClick={handleCreate}
-              loading={createMutation.isPending}
-              disabled={!isFormValid || createMutation.isPending}>
+            <Button onClick={handleCreate} loading={createMutation.isPending} disabled={!isFormValid || createMutation.isPending}>
               Create User
             </Button>
           </>
@@ -220,41 +262,74 @@ export default function UserRoleManagement() {
           )}
           <div>
             <label className="input-label">Full Name</label>
-            <input type="text" value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="Jane Smith"
-              className="input" />
+            <input type="text" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Jane Smith" className="input" />
           </div>
           <div>
             <label className="input-label">Email Address</label>
-            <input type="email" value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              placeholder="jane@hospease.com"
-              className="input" />
+            <input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="jane@hospease.com" className="input" />
           </div>
           <div>
             <label className="input-label">Phone Number</label>
-            <input type="tel" value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-              placeholder="+1-555-000-0000"
-              className="input" />
+            <input type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+1-555-000-0000" className="input" />
           </div>
           <div>
             <label className="input-label">Password</label>
-            <input type="password" value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              placeholder="Min. 8 characters"
-              className="input" />
+            <input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} placeholder="Min. 8 characters" className="input" />
           </div>
           <div>
             <label className="input-label">Role</label>
-            <select value={form.role}
-              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-              className="select">
+            <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} className="select">
               <option value="" disabled>Select a role…</option>
               {backendRoles.map((r) => (
                 <option key={r} value={r}>{roleLabel(r)}</option>
               ))}
+            </select>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal open={!!editingUser} onClose={() => setEditingUser(null)} title="Edit User" subtitle="Update user account details" size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditingUser(null)}>Cancel</Button>
+            <Button onClick={handleUpdate} loading={updateMutation.isPending} disabled={!isEditFormValid || updateMutation.isPending}>
+              Save Changes
+            </Button>
+          </>
+        }>
+        <div className="space-y-4">
+          {updateMutation.isError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">
+              Failed to update user. Please try again.
+            </div>
+          )}
+          <div>
+            <label className="input-label">Full Name</label>
+            <input type="text" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="input" />
+          </div>
+          <div>
+            <label className="input-label">Email Address</label>
+            <input type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} className="input" />
+          </div>
+          <div>
+            <label className="input-label">Phone Number</label>
+            <input type="tel" value={editForm.phone} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} className="input" />
+          </div>
+          <div>
+            <label className="input-label">Role</label>
+            <select value={editForm.role} onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))} className="select">
+              {backendRoles.map((r) => (
+                <option key={r} value={r}>{roleLabel(r)}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="input-label">Status</label>
+            <select value={editForm.status} onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))} className="select">
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
+              <option value="SUSPENDED">SUSPENDED</option>
             </select>
           </div>
         </div>

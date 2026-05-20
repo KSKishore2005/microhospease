@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Edit, Save, Plus } from 'lucide-react';
+import { Edit, Save, Plus, Settings } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
@@ -8,8 +8,9 @@ import Modal from '../../components/common/Modal';
 import { roomsApi } from '../../api/rooms';
 import type { RoomResponseDto } from '../../api/rooms';
 import { formatCurrency } from '../../utils/formatters';
+import { useToastStore } from '../../store/toastStore';
 
-const FACILITIES = [
+const INITIAL_FACILITIES = [
   { name: 'Main Restaurant', hours: '06:30–23:00', status: 'OPEN' },
   { name: 'Spa & Wellness Center', hours: '08:00–21:00', status: 'OPEN' },
   { name: 'Fitness Center', hours: '05:00–23:00', status: 'OPEN' },
@@ -23,9 +24,18 @@ export default function PropertyConfiguration() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRate, setEditRate] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingFacility, setEditingFacility] = useState<typeof INITIAL_FACILITIES[0] | null>(null);
+  
   const [form, setForm] = useState({ number: '', type: 'SINGLE' as 'SINGLE' | 'DOUBLE' | 'SUITE' | 'DELUXE', capacity: 2, ratePerNight: 150 });
+  const [facilityForm, setFacilityForm] = useState({ hours: '', status: 'OPEN' });
 
+  const addToast = useToastStore((s) => s.addToast);
   const queryClient = useQueryClient();
+
+  const [facilities, setFacilities] = useState(() => {
+    const saved = localStorage.getItem('hospease-facilities');
+    return saved ? JSON.parse(saved) : INITIAL_FACILITIES;
+  });
 
   const { data: rooms = [] } = useQuery({
     queryKey: ['rooms'],
@@ -37,6 +47,7 @@ export default function PropertyConfiguration() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       setEditingId(null);
+      addToast('Room rate updated successfully!', 'success');
     },
   });
 
@@ -45,10 +56,10 @@ export default function PropertyConfiguration() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rooms'] });
       setShowAdd(false);
+      addToast('Room added successfully!', 'success');
     },
   });
 
-  // Group rooms by type
   const roomTypes = ['SINGLE', 'DOUBLE', 'SUITE', 'DELUXE'];
   const roomTypeGroups = roomTypes.map((type) => {
     const typeRooms = rooms.filter((r) => r.type === type);
@@ -65,6 +76,25 @@ export default function PropertyConfiguration() {
 
   const saveEdit = (roomId: string) => {
     updateMutation.mutate({ id: roomId, payload: { ratePerNight: editRate } });
+  };
+
+  const handleEditFacility = (facility: typeof INITIAL_FACILITIES[0]) => {
+    setEditingFacility(facility);
+    setFacilityForm({ hours: facility.hours, status: facility.status });
+  };
+
+  const handleSaveFacility = () => {
+    if (!editingFacility) return;
+    const updated = facilities.map((f: any) => {
+      if (f.name === editingFacility.name) {
+        return { ...f, hours: facilityForm.hours, status: facilityForm.status };
+      }
+      return f;
+    });
+    setFacilities(updated);
+    localStorage.setItem('hospease-facilities', JSON.stringify(updated));
+    setEditingFacility(null);
+    addToast(`${editingFacility.name} settings updated successfully!`, 'success');
   };
 
   return (
@@ -152,20 +182,46 @@ export default function PropertyConfiguration() {
       {/* Facility hours */}
       <Card title="Facility Hours & Status">
         <div className="grid sm:grid-cols-2 gap-3">
-          {FACILITIES.map((f) => (
-            <div key={f.name} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-all">
+          {facilities.map((f: any) => (
+            <div key={f.name} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-all bg-white">
               <div>
                 <p className="font-medium text-gray-900 text-sm">{f.name}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{f.hours}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${f.status === 'OPEN' ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                <span className={`text-xs font-medium ${f.status === 'OPEN' ? 'text-emerald-600' : 'text-gray-500'}`}>{f.status}</span>
+              <div className="flex items-center gap-3">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${f.status === 'OPEN' ? 'bg-emerald-100 text-emerald-700' : f.status === 'CLOSED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {f.status}
+                </span>
+                <Button size="xs" variant="ghost" icon={<Settings size={12} />} onClick={() => handleEditFacility(f)} />
               </div>
             </div>
           ))}
         </div>
       </Card>
+
+      {/* Edit Facility Modal */}
+      <Modal open={!!editingFacility} onClose={() => setEditingFacility(null)} title={`Edit ${editingFacility?.name}`} subtitle="Update hours and operation status" size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditingFacility(null)}>Cancel</Button>
+            <Button onClick={handleSaveFacility}>Save</Button>
+          </>
+        }>
+        <div className="space-y-4">
+          <div>
+            <label className="input-label">Operating Hours</label>
+            <input value={facilityForm.hours} onChange={(e) => setFacilityForm((f) => ({ ...f, hours: e.target.value }))} className="input" />
+          </div>
+          <div>
+            <label className="input-label">Status</label>
+            <select value={facilityForm.status} onChange={(e) => setFacilityForm((f) => ({ ...f, status: e.target.value }))} className="select">
+              <option value="OPEN">OPEN</option>
+              <option value="CLOSED">CLOSED</option>
+              <option value="MAINTENANCE">UNDER MAINTENANCE</option>
+            </select>
+          </div>
+        </div>
+      </Modal>
 
       {/* Add Room Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add New Room" size="md"

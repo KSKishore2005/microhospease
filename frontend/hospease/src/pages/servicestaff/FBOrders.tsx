@@ -7,7 +7,7 @@ import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { serviceOrdersApi } from '../../api/serviceOrders';
-import type { ServiceOrderResponseDto, ServiceType } from '../../api/serviceOrders';
+import type { ServiceOrderResponseDto, ServiceType, ServiceOrderStatus } from '../../api/serviceOrders';
 import { reservationsApi } from '../../api/reservations';
 import { formatCurrency, formatRelative } from '../../utils/formatters';
 
@@ -70,7 +70,7 @@ export default function FBOrders() {
   );
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => serviceOrdersApi.updateStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: ServiceOrderStatus }) => serviceOrdersApi.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['service-orders', 'RESTAURANT'] });
       queryClient.invalidateQueries({ queryKey: ['service-orders', 'ROOM_SERVICE'] });
@@ -89,7 +89,7 @@ export default function FBOrders() {
 
   const advance = (id: string, currentStatus: string) => {
     const next = STATUS_FLOW[currentStatus];
-    if (next) updateStatusMutation.mutate({ id, status: next });
+    if (next) updateStatusMutation.mutate({ id, status: next as ServiceOrderStatus });
   };
 
   const selectedReservation = activeReservations.find((r) => String(r.reservationId) === form.reservationId);

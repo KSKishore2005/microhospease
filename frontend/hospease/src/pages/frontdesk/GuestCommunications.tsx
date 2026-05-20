@@ -1,20 +1,29 @@
-import { useState } from 'react';
-import { Send, ListFilter, MessageSquare, Inbox } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Send, Inbox, MessageSquare } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
 import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import { serviceOrdersApi } from '../../api/serviceOrders';
-import type { ServiceOrderResponseDto } from '../../api/serviceOrders';
+import type { ServiceOrderResponseDto, ServiceOrderStatus } from '../../api/serviceOrders';
 import { formatRelative } from '../../utils/formatters';
+import { useToastStore } from '../../store/toastStore';
 
 const TYPE_FILTERS = ['ALL', 'ROOM_SERVICE', 'MAINTENANCE', 'CONCIERGE', 'HOUSEKEEPING', 'OTHER'] as const;
 type TypeFilter = (typeof TYPE_FILTERS)[number];
 
+interface Reply {
+  text: string;
+  createdAt: string;
+}
+
 export default function GuestCommunications() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
   const [selected, setSelected] = useState<ServiceOrderResponseDto | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const addToast = useToastStore((s) => s.addToast);
 
   const queryClient = useQueryClient();
 
@@ -24,9 +33,39 @@ export default function GuestCommunications() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => serviceOrdersApi.updateStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: ServiceOrderStatus }) => serviceOrdersApi.updateStatus(id, status),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['service-orders'] }),
   });
+
+  // Load replies when selected order changes
+  useEffect(() => {
+    if (selected) {
+      const stored = localStorage.getItem(`hospease-reply-history-${selected.orderId}`);
+      setReplies(stored ? JSON.parse(stored) : []);
+      setReplyText('');
+    }
+  }, [selected]);
+
+  const handleSendReply = () => {
+    if (!selected || !replyText.trim()) return;
+
+    const newReply: Reply = {
+      text: replyText.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedReplies = [...replies, newReply];
+    localStorage.setItem(`hospease-reply-history-${selected.orderId}`, JSON.stringify(updatedReplies));
+    setReplies(updatedReplies);
+    setReplyText('');
+
+    // Automatically transition to IN_PROGRESS if pending
+    if (selected.status === 'PENDING') {
+      updateStatusMutation.mutate({ id: selected.orderId, status: 'IN_PROGRESS' });
+    }
+
+    addToast('Reply sent successfully to guest!', 'success');
+  };
 
   const filtered = typeFilter === 'ALL'
     ? serviceOrders
@@ -79,17 +118,17 @@ export default function GuestCommunications() {
               ))}
             </div>
 
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-gray-50 max-h-[500px] overflow-y-auto">
               {filtered.map((order) => (
                 <div key={order.orderId} onClick={() => setSelected(order)}
                   className={`p-4 cursor-pointer transition-all hover:bg-gray-50 ${selected?.orderId === order.orderId ? 'bg-navy-50 border-l-2 border-navy-700' : ''}`}>
                   <div className="flex items-start gap-2">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${order.status === 'PENDING' ? 'bg-rose-500' : 'bg-gray-300'}`} />
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${order.status === 'PENDING' ? 'bg-rose-500 animate-pulse' : 'bg-gray-300'}`} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{order.serviceType.replace(/_/g, ' ')}</p>
                       <p className="text-xs text-gray-500 mt-0.5">Order #{String(order.orderId).slice(0, 8)}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${typeColors[order.serviceType] ?? 'bg-gray-100 text-gray-600'}`}>{order.serviceType.replace(/_/g, ' ')}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border ${typeColors[order.serviceType] ?? 'bg-gray-100 text-gray-600'}`}>{order.serviceType.replace(/_/g, ' ')}</span>
                         <span className="text-xs text-gray-400">{formatRelative(order.createdAt)}</span>
                       </div>
                     </div>
@@ -120,12 +159,52 @@ export default function GuestCommunications() {
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-700 leading-relaxed mb-4">
-                {selected.description ?? 'No description provided.'}
+              {/* Chat Stream */}
+              <div className="space-y-3 max-h-60 overflow-y-auto mb-4 border border-gray-100 rounded-xl p-3 bg-gray-50/50">
+                <div className="flex flex-col items-start bg-white p-3 rounded-2xl shadow-sm border border-gray-100 max-w-[85%]">
+                  <span className="text-[10px] font-bold text-navy-700 uppercase mb-0.5">Guest Request</span>
+                  <p className="text-sm text-gray-700 leading-relaxed">{selected.description ?? 'No description provided.'}</p>
+                  <span className="text-[9px] text-gray-400 self-end mt-1">{formatRelative(selected.createdAt)}</span>
+                </div>
+
+                {replies.map((reply, idx) => (
+                  <div key={idx} className="flex flex-col items-end bg-navy-900 text-white p-3 rounded-2xl shadow-sm max-w-[85%] ml-auto">
+                    <span className="text-[10px] font-bold text-gold-400 uppercase mb-0.5">Staff Reply</span>
+                    <p className="text-sm leading-relaxed">{reply.text}</p>
+                    <span className="text-[9px] text-navy-300 self-end mt-1">{formatRelative(reply.createdAt)}</span>
+                  </div>
+                ))}
               </div>
 
+              {/* Reply Section */}
+              {selected.status !== 'COMPLETED' && selected.status !== 'CANCELLED' && (
+                <div className="space-y-2 mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex justify-between items-center text-xs text-gray-400">
+                    <label className="font-semibold">Write Reply</label>
+                    <span>{replyText.length}/500</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <textarea
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value.slice(0, 500))}
+                      placeholder="Type your response to the guest..."
+                      rows={2}
+                      className="textarea flex-1 min-h-[50px] resize-none"
+                    />
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={!replyText.trim() || updateStatusMutation.isPending}
+                      icon={<Send size={14} />}
+                      size="sm"
+                    >
+                      Send
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
-              <div className="border-t border-gray-100 pt-4">
+              <div className="border-t border-gray-100 pt-4 mt-4">
                 <div className="flex justify-between items-center">
                   <div className="flex gap-2">
                     {selected.status === 'PENDING' && (
@@ -138,12 +217,13 @@ export default function GuestCommunications() {
                         Mark Completed
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" onClick={() => updateStatusMutation.mutate({ id: selected.orderId, status: 'CANCELLED' })}
-                      className="text-rose-600">
-                      Cancel
-                    </Button>
+                    {selected.status !== 'COMPLETED' && selected.status !== 'CANCELLED' && (
+                      <Button variant="ghost" size="sm" onClick={() => updateStatusMutation.mutate({ id: selected.orderId, status: 'CANCELLED' })}
+                        className="text-rose-600">
+                        Cancel Order
+                      </Button>
+                    )}
                   </div>
-                  <Button icon={<Send size={14} />} size="sm">Send Reply</Button>
                 </div>
               </div>
             </Card>

@@ -6,6 +6,8 @@ import Layout from '../components/common/Layout';
 import LoginPage from '../pages/auth/LoginPage';
 import RegisterPage from '../pages/auth/RegisterPage';
 import ApiTester from '../pages/ApiTester';
+import LandingPage from '../pages/LandingPage';
+import ToastProvider from '../components/common/ToastProvider';
 
 import GuestDashboard from '../pages/guest/GuestDashboard';
 import Reservations from '../pages/guest/Reservations';
@@ -71,7 +73,7 @@ function Unauthorized() {
 }
 
 const router = createBrowserRouter([
-  { path: '/', element: <RootRedirect /> },
+  { path: '/', element: <LandingPage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/unauthorized', element: <Unauthorized /> },
@@ -176,5 +178,10 @@ const router = createBrowserRouter([
 ]);
 
 export default function AppRouter() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <ToastProvider />
+    </>
+  );
 }

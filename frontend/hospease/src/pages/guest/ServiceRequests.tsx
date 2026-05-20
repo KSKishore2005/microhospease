@@ -51,7 +51,7 @@ export default function ServiceRequests() {
   });
 
   const activeReservations = reservations.filter(
-    (r) => r.status === 'CONFIRMED' || r.status === 'CHECKED_IN',
+    (r) => r.status === 'CHECKED_IN',
   );
 
   const selectedReservation = activeReservations.find(
@@ -90,7 +90,7 @@ export default function ServiceRequests() {
           <h1 className="text-2xl font-bold text-gray-900">Service Requests</h1>
           <p className="text-sm text-gray-400 mt-0.5">Submit and track in-room service requests</p>
         </div>
-        <Button onClick={() => setShowNew(true)} icon={<Plus size={16} />}>New Request</Button>
+        <Button onClick={() => setShowNew(true)} icon={<Plus size={16} />} disabled={activeReservations.length === 0}>New Request</Button>
       </div>
 
       {/* Status summary */}
@@ -109,10 +109,16 @@ export default function ServiceRequests() {
         ))}
       </div>
 
-      {/* No active reservation warning */}
+      {/* No checked-in reservation warning */}
       {!isLoading && activeReservations.length === 0 && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
-          You need an active reservation (Confirmed or Checked-In) to submit service requests.
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700 flex items-start gap-2.5">
+          <span className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-bold shrink-0">!</span>
+          <div>
+            <p className="font-semibold">Checked-In Reservation Required</p>
+            <p className="text-xs text-amber-600 mt-0.5 animate-pulse">
+              Room service, housekeeping, laundry, and maintenance requests are strictly restricted to guests who are currently checked into their rooms. If you have an upcoming confirmed reservation, please check in at the front desk to activate these services.
+            </p>
+          </div>
         </div>
       )}
 

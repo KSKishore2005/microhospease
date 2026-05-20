@@ -1,5 +1,6 @@
 package com.cognizant.hospease.controller;
 
+import com.cognizant.hospease.common.exception.ResourceNotFoundException;
 import com.cognizant.hospease.dto.ReportRequestDto;
 import com.cognizant.hospease.dto.ReportResponseDto;
 import com.cognizant.hospease.enums.ReportScope;
@@ -7,18 +8,29 @@ import com.cognizant.hospease.security.RoleRequired;
 import com.cognizant.hospease.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
     private final ReportService reportService;
+
+    @Value("${report.storage.path}")
+    private String reportPath;
 
     @GetMapping
     @RoleRequired({"MANAGER", "ADMINISTRATOR", "AUDITOR"})
@@ -62,5 +74,31 @@ public class ReportController {
     public ResponseEntity<Void> deleteReport(@PathVariable Long id) {
         reportService.deleteReport(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Streams the generated PDF for a report. Goes through the API gateway so the
+     * JWT auth flow protects the file (the static-resource fallback at /reports/**
+     * doesn't traverse the gateway).
+     */
+    @GetMapping("/{id}/download")
+    @RoleRequired({"MANAGER", "ADMINISTRATOR", "AUDITOR"})
+    public ResponseEntity<Resource> downloadReport(@PathVariable Long id) {
+        ReportResponseDto report = reportService.getReportById(id);
+
+        String fileName = report.getReportType().replaceAll("\\s+", "_")
+                + "_ID_" + id + ".pdf";
+        File pdf = new File(reportPath, fileName);
+        if (!pdf.exists() || !pdf.isFile()) {
+            log.warn("PDF file not found for report id={} at {}", id, pdf.getAbsolutePath());
+            throw new ResourceNotFoundException("Report PDF", "id", id);
+        }
+
+        FileSystemResource resource = new FileSystemResource(pdf);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + fileName + "\"")
+                .body(resource);
     }
 }

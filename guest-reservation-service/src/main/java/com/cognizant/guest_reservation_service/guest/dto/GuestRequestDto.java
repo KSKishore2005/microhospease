@@ -23,8 +23,7 @@ public class GuestRequestDto {
     @Size(max = 150, message = "Email must be at most 150 characters")
     private String email;
 
-    @NotBlank(message = "Phone number is required")
-    @Pattern(regexp = "^[+]?[0-9]{7,15}$", message = "Phone must be 7-15 digits, optionally starting with '+'")
+    @Size(min = 7, max = 20, message = "Phone must be 7–20 characters when provided")
     private String phone;
 
     @PastOrPresent(message = "Date of birth cannot be in the future")

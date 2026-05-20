@@ -24,7 +24,7 @@ public class Room {
     private String number;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 32)
     private RoomType type;
 
     private Integer capacity;
@@ -33,6 +33,7 @@ public class Room {
     private String amenitiesJson;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
     @Builder.Default
     private RoomStatus status = RoomStatus.AVAILABLE;
 

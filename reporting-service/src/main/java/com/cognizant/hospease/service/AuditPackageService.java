@@ -54,7 +54,7 @@ public class AuditPackageService {
             throw new BadRequestException("'to' date must be after 'from' date");
         }
         return DtoMapper.toAuditPackageResponseDtoList(
-                auditPackageRepository.findByPeriodStartGreaterThanEqualAndPeriodEndLessThanEqual(from, to));
+                auditPackageRepository.findOverlappingRange(from, to));
     }
 
     @Transactional(readOnly = true)
@@ -68,6 +68,12 @@ public class AuditPackageService {
     public AuditPackageResponseDto createPackage(AuditPackageRequestDto dto) {
         if (!dto.getPeriodEnd().isAfter(dto.getPeriodStart())) {
             throw new BadRequestException("periodEnd must be after periodStart");
+        }
+        // Audit packages summarise PAST activity. Refuse to package data for a
+        // window that hasn't happened yet (it would just be empty / misleading).
+        if (dto.getPeriodEnd().isAfter(LocalDate.now())) {
+            throw new BadRequestException(
+                    "periodEnd cannot be in the future (was " + dto.getPeriodEnd() + ").");
         }
 
         String contents = aggregateAuditContents(dto.getPeriodStart(), dto.getPeriodEnd(),
@@ -97,6 +103,10 @@ public class AuditPackageService {
     public AuditPackageResponseDto updatePackage(Long id, AuditPackageRequestDto dto) {
         if (!dto.getPeriodEnd().isAfter(dto.getPeriodStart())) {
             throw new BadRequestException("periodEnd must be after periodStart");
+        }
+        if (dto.getPeriodEnd().isAfter(LocalDate.now())) {
+            throw new BadRequestException(
+                    "periodEnd cannot be in the future (was " + dto.getPeriodEnd() + ").");
         }
         AuditPackage existing = findEntityById(id);
         existing.setPeriodStart(dto.getPeriodStart());

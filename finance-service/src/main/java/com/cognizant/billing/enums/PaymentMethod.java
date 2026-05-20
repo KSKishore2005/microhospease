@@ -1,7 +1,10 @@
 package com.cognizant.billing.enums;
 
 public enum PaymentMethod {
+    CREDIT_CARD,
+    DEBIT_CARD,
     CASH,
-    CARD,
-    ONLINE
+    BANK_TRANSFER,
+    UPI,
+    WALLET
 }

@@ -22,6 +22,7 @@ import com.cognizant.user_service.dto.UserResponseDTO;
 import com.cognizant.user_service.entity.User;
 import com.cognizant.user_service.security.Role;
 import com.cognizant.user_service.service.UserService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,10 +32,11 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
 
     @PostMapping
     @PreAuthorize("hasAuthority('ADMINISTRATOR')")
-    public ResponseEntity<UserResponseDTO> createUser(@RequestBody UserRequestDTO userRequestDTO) {
+    public ResponseEntity<UserResponseDTO> createUser(@jakarta.validation.Valid @RequestBody UserRequestDTO userRequestDTO) {
         User user = mapToEntity(userRequestDTO);
         User savedUser = userService.createUser(user);
         return new ResponseEntity<>(mapToResponseDTO(savedUser), HttpStatus.CREATED);
@@ -62,8 +64,12 @@ public class UserController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMINISTRATOR')")
-    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable Long id, @RequestBody UserRequestDTO userRequestDTO) {
+    public ResponseEntity<UserResponseDTO> updateUser(@PathVariable Long id, @jakarta.validation.Valid @RequestBody UserRequestDTO userRequestDTO) {
         User user = mapToEntity(userRequestDTO);
+        // If no new password supplied, preserve the existing hash
+        if (userRequestDTO.getPassword() == null || userRequestDTO.getPassword().isBlank()) {
+            user.setPasswordHash(userService.getUserById(id).getPasswordHash());
+        }
         User updatedUser = userService.updateUser(id, user);
         return ResponseEntity.ok(mapToResponseDTO(updatedUser));
     }
@@ -105,8 +111,12 @@ public class UserController {
         user.setRole(dto.getRole());
         user.setEmail(dto.getEmail());
         user.setPhone(dto.getPhone());
-        user.setMfaEnabled(dto.getMfaEnabled());
-        user.setStatus(dto.getStatus());
+        user.setMfaEnabled(dto.getMfaEnabled() != null ? dto.getMfaEnabled() : false);
+        user.setStatus(dto.getStatus() != null ? dto.getStatus() : "ACTIVE");
+        // Hash password when provided
+        if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+            user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+        }
         return user;
     }
 

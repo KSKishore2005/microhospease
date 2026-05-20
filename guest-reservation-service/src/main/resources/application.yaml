@@ -28,6 +28,11 @@ spring:
         dialect: org.hibernate.dialect.MySQL8Dialect
     open-in-view: false
 
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      write-date-timestamps-as-nanoseconds: false
+
   sql:
     init:
       mode: never
@@ -37,9 +42,12 @@ spring:
       okhttp:
         enabled: true
 
-# Room Service URL fallback (used by Feign if Eureka can't resolve)
+# Feign fallback URLs (used only if Eureka can't resolve the service name)
 room-service:
   url: http://localhost:8082
+
+finance-service:
+  url: http://localhost:8086
 
 eureka:
   client:

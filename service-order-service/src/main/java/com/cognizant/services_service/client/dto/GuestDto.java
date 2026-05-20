@@ -15,6 +15,7 @@ public class GuestDto {
     private Long guestId;
     private Long userId;
     private String name;
+    private String email;
     private String loyaltyTier;
     private String status;
 }

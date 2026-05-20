@@ -24,4 +24,10 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
     List<ServiceOrder> findByServiceType(ServiceType serviceType);
 
     List<ServiceOrder> findByStatus(ServiceOrderStatus status);
+
+    /** Orders assigned to a specific service-staff user. */
+    List<ServiceOrder> findByAssignedToUserId(Long assignedToUserId);
+
+    /** Open orders that are not yet picked up by any staff member (the queue). */
+    List<ServiceOrder> findByAssignedToUserIdIsNullAndStatus(ServiceOrderStatus status);
 }

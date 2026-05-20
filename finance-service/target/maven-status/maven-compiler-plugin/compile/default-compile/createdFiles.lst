@@ -1,6 +1,7 @@
 com\cognizant\billing\dto\PaymentRequestDto.class
 com\cognizant\billing\enums\PaymentStatus.class
 com\cognizant\billing\security\FeignAuthInterceptor.class
+com\cognizant\billing\config\FeignJwtInterceptor.class
 com\cognizant\billing\entity\Payment.class
 com\cognizant\billing\client\dto\ReservationDto$EmbeddedRoom.class
 com\cognizant\billing\security\LocalSecurityConfig.class

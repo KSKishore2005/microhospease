@@ -42,13 +42,55 @@ public class ReportContentGeneratorService {
     public String generate(ReportScope scope) {
         if (scope == null) return generateGeneral();
         return switch (scope) {
-            case OCCUPANCY    -> generateOccupancy();
-            case FINANCE      -> generateFinance();
-            case HOUSEKEEPING -> generateHousekeeping();
-            case SERVICES     -> generateServices();
-            case STAFF        -> generateStaff();
-            case GENERAL      -> generateGeneral();
+            case OCCUPANCY            -> generateOccupancy();
+            case FINANCE, FINANCIAL   -> generateFinance();
+            case REVENUE              -> generateRevenue();
+            case HOUSEKEEPING         -> generateHousekeeping();
+            case SERVICES             -> generateServices();
+            case STAFF                -> generateStaff();
+            case OPERATIONAL, GENERAL -> generateGeneral();
         };
+    }
+
+    /**
+     * Revenue-specific report: focuses on collected amounts and trends per status
+     * rather than the broader finance summary.
+     */
+    private String generateRevenue() {
+        try {
+            List<InvoiceDto> all = financeClient.getAllInvoices();
+            BigDecimal totalRevenue = all.stream()
+                    .filter(i -> "PAID".equalsIgnoreCase(i.getStatus()))
+                    .map(InvoiceDto::getTotalAmount)
+                    .filter(a -> a != null)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            BigDecimal outstanding = all.stream()
+                    .filter(i -> "UNPAID".equalsIgnoreCase(i.getStatus())
+                              || "OVERDUE".equalsIgnoreCase(i.getStatus()))
+                    .map(InvoiceDto::getBalanceDue)
+                    .filter(a -> a != null)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            long paidInvoices = all.stream().filter(i -> "PAID".equalsIgnoreCase(i.getStatus())).count();
+            BigDecimal avgInvoice = paidInvoices > 0
+                    ? totalRevenue.divide(BigDecimal.valueOf(paidInvoices), 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("Revenue Report\n");
+            sb.append("--------------\n");
+            sb.append(line("Total Collected Revenue", "$" + totalRevenue));
+            sb.append(line("Outstanding Receivables", "$" + outstanding));
+            sb.append(line("Paid Invoices",           String.valueOf(paidInvoices)));
+            sb.append(line("Average Invoice Value",   "$" + avgInvoice));
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("Auto-generate REVENUE failed: {}", e.getMessage());
+            return "Revenue data could not be retrieved automatically. Please enter the content summary manually.";
+        }
     }
 
     // ─── OCCUPANCY ────────────────────────────────────────────────────────────────

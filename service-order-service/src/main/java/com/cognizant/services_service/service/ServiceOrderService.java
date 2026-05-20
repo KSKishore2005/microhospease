@@ -73,41 +73,67 @@ public class ServiceOrderService {
         return repository.findByStatus(status).stream().map(this::enrich).toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<ServiceOrderResponseDto> getOrdersByAssignee(Long userId) {
+        log.debug("Fetching service orders assigned to userId={}", userId);
+        return repository.findByAssignedToUserId(userId).stream().map(this::enrich).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceOrderResponseDto> getUnassignedOpenOrders() {
+        log.debug("Fetching unassigned PENDING service orders (queue)");
+        return repository.findByAssignedToUserIdIsNullAndStatus(ServiceOrderStatus.PENDING)
+                .stream().map(this::enrich).toList();
+    }
+
     // ─── Write Operations ────────────────────────────────────────────────────────
 
     public ServiceOrderResponseDto createOrder(ServiceOrderRequestDto dto) {
         log.info("Creating service order for guestId={}, reservationId={}, roomId={}",
                 dto.getGuestId(), dto.getReservationId(), dto.getRoomId());
 
-        // 1. Validate guest exists and is ACTIVE
-        GuestDto guest = fetchGuestOrThrow(dto.getGuestId());
-        if (guest.getStatus() != null && !"ACTIVE".equalsIgnoreCase(guest.getStatus())) {
-            throw new BadRequestException(
-                    "Cannot create service order: guest id=" + guest.getGuestId()
-                            + " has status '" + guest.getStatus() + "'.");
+        GuestDto guest = null;
+        RoomDto room = null;
+
+        // 1. Validate guest if provided
+        if (dto.getGuestId() != null) {
+            guest = fetchGuestOrThrow(dto.getGuestId());
+            if (guest.getStatus() != null && !"ACTIVE".equalsIgnoreCase(guest.getStatus())) {
+                throw new BadRequestException(
+                        "Cannot create service order: guest id=" + guest.getGuestId()
+                                + " has status '" + guest.getStatus() + "'.");
+            }
         }
 
-        // 2. Validate reservation exists and matches guest+room
-        ReservationDto reservation = fetchReservationOrThrow(dto.getReservationId());
-        if (!reservation.getGuestId().equals(dto.getGuestId())) {
-            throw new BadRequestException(
-                    "Reservation " + reservation.getResId() + " does not belong to guest "
-                            + dto.getGuestId() + " (belongs to guest " + reservation.getGuestId() + ").");
-        }
-        if (!reservation.getRoomId().equals(dto.getRoomId())) {
-            throw new BadRequestException(
-                    "Reservation " + reservation.getResId() + " is for room " + reservation.getRoomId()
-                            + ", not room " + dto.getRoomId() + ".");
-        }
-        if (reservation.getStatus() != null
-                && !Set.of("CONFIRMED", "CHECKED_IN").contains(reservation.getStatus().toUpperCase())) {
-            throw new BadRequestException(
-                    "Cannot create service order: reservation " + reservation.getResId()
-                            + " has status '" + reservation.getStatus() + "'.");
+        // 2. Validate reservation if provided
+        if (dto.getReservationId() != null) {
+            ReservationDto reservation = fetchReservationOrThrow(dto.getReservationId());
+            if (dto.getGuestId() != null && !reservation.getGuestId().equals(dto.getGuestId())) {
+                throw new BadRequestException(
+                        "Reservation " + reservation.getResId() + " does not belong to guest "
+                                + dto.getGuestId() + " (belongs to guest " + reservation.getGuestId() + ").");
+            }
+            if (dto.getRoomId() != null && !reservation.getRoomId().equals(dto.getRoomId())) {
+                throw new BadRequestException(
+                        "Reservation " + reservation.getResId() + " is for room " + reservation.getRoomId()
+                                + ", not room " + dto.getRoomId() + ".");
+            }
+            // A guest must be physically in the hotel to consume services.
+            // CONFIRMED bookings haven't checked in yet; CHECKED_OUT / CANCELLED
+            // are terminal. Only CHECKED_IN can place service orders.
+            if (reservation.getStatus() != null
+                    && !"CHECKED_IN".equalsIgnoreCase(reservation.getStatus())) {
+                throw new BadRequestException(
+                        "Cannot create service order: reservation " + reservation.getResId()
+                                + " is in status '" + reservation.getStatus()
+                                + "'. Guest must be CHECKED_IN.");
+            }
         }
 
-        // 3. Validate room exists
-        RoomDto room = fetchRoomOrThrow(dto.getRoomId());
+        // 3. Validate room if provided
+        if (dto.getRoomId() != null) {
+            room = fetchRoomOrThrow(dto.getRoomId());
+        }
 
         // 4. Persist
         ServiceOrder saved = repository.save(ServiceOrderMapper.toEntity(dto));
@@ -128,30 +154,35 @@ public class ServiceOrderService {
                     "Cannot edit a service order in status '" + existing.getStatus() + "'.");
         }
 
-        // Re-validate references when they change
-        boolean guestChanged = !existing.getGuestId().equals(dto.getGuestId());
-        boolean reservationChanged = !existing.getReservationId().equals(dto.getReservationId());
-        boolean roomChanged = !existing.getRoomId().equals(dto.getRoomId());
+        // Re-validate references when they change (null-safe)
+        boolean guestChanged = !java.util.Objects.equals(existing.getGuestId(), dto.getGuestId());
+        boolean reservationChanged = !java.util.Objects.equals(existing.getReservationId(), dto.getReservationId());
+        boolean roomChanged = !java.util.Objects.equals(existing.getRoomId(), dto.getRoomId());
 
         GuestDto guest = null;
         RoomDto room = null;
 
-        if (guestChanged) {
+        if (guestChanged && dto.getGuestId() != null) {
             guest = fetchGuestOrThrow(dto.getGuestId());
+            if (guest.getStatus() != null && !"ACTIVE".equalsIgnoreCase(guest.getStatus())) {
+                throw new BadRequestException(
+                        "Cannot update service order: guest id=" + guest.getGuestId()
+                                + " has status '" + guest.getStatus() + "'.");
+            }
         }
-        if (reservationChanged || guestChanged || roomChanged) {
+        if ((reservationChanged || guestChanged || roomChanged) && dto.getReservationId() != null) {
             ReservationDto r = fetchReservationOrThrow(dto.getReservationId());
-            if (!r.getGuestId().equals(dto.getGuestId())) {
+            if (dto.getGuestId() != null && !r.getGuestId().equals(dto.getGuestId())) {
                 throw new BadRequestException(
                         "Reservation " + r.getResId() + " does not belong to guest " + dto.getGuestId());
             }
-            if (!r.getRoomId().equals(dto.getRoomId())) {
+            if (dto.getRoomId() != null && !r.getRoomId().equals(dto.getRoomId())) {
                 throw new BadRequestException(
                         "Reservation " + r.getResId() + " is for room " + r.getRoomId()
                                 + ", not room " + dto.getRoomId());
             }
         }
-        if (roomChanged) {
+        if (roomChanged && dto.getRoomId() != null) {
             room = fetchRoomOrThrow(dto.getRoomId());
         }
 
@@ -164,6 +195,42 @@ public class ServiceOrderService {
 
         ServiceOrder saved = repository.save(existing);
         return enrich(saved);
+    }
+
+    /**
+     * Assigns (or re-assigns) the order to a staff member. Typically called when a
+     * service-staff user picks an order from the unassigned queue.
+     */
+    public ServiceOrderResponseDto assignOrder(Long id, Long userId) {
+        log.info("Assigning service order id={} to userId={}", id, userId);
+        ServiceOrder existing = findEntityById(id);
+
+        if (existing.getStatus() == ServiceOrderStatus.COMPLETED
+                || existing.getStatus() == ServiceOrderStatus.CANCELLED) {
+            throw new BadRequestException(
+                    "Cannot assign an order in terminal status '" + existing.getStatus() + "'.");
+        }
+        existing.setAssignedToUserId(userId);
+        return enrich(repository.save(existing));
+    }
+
+    /**
+     * Convenience: assign to the staff member AND move to IN_PROGRESS in one call.
+     * Used by the "Accept & Start" button in the service-fulfillment UI.
+     */
+    public ServiceOrderResponseDto acceptOrder(Long id, Long userId) {
+        log.info("Service-staff userId={} accepting order id={}", userId, id);
+        ServiceOrder existing = findEntityById(id);
+
+        if (existing.getStatus() != ServiceOrderStatus.PENDING
+                && existing.getStatus() != ServiceOrderStatus.CONFIRMED) {
+            throw new BadRequestException(
+                    "Only PENDING or CONFIRMED orders can be accepted; current: " + existing.getStatus());
+        }
+        existing.setAssignedToUserId(userId);
+        validateStatusTransition(existing.getStatus(), ServiceOrderStatus.IN_PROGRESS);
+        existing.setStatus(ServiceOrderStatus.IN_PROGRESS);
+        return enrich(repository.save(existing));
     }
 
     public ServiceOrderResponseDto updateOrderStatus(Long id, ServiceOrderStatus newStatus) {
@@ -181,7 +248,8 @@ public class ServiceOrderService {
         log.info("Deleting service order id={}", id);
         ServiceOrder existing = findEntityById(id);
 
-        if (existing.getStatus() == ServiceOrderStatus.IN_PROGRESS
+        if (existing.getStatus() == ServiceOrderStatus.CONFIRMED
+                || existing.getStatus() == ServiceOrderStatus.IN_PROGRESS
                 || existing.getStatus() == ServiceOrderStatus.COMPLETED) {
             throw new BadRequestException(
                     "Cannot delete a service order in status '" + existing.getStatus()
@@ -200,10 +268,11 @@ public class ServiceOrderService {
     /**
      * Validates status transitions to prevent illegal moves like COMPLETED → PENDING.
      * <pre>
-     *   PENDING      → IN_PROGRESS | CANCELLED
-     *   IN_PROGRESS  → COMPLETED   | CANCELLED
-     *   COMPLETED    → (terminal)
-     *   CANCELLED    → (terminal)
+     *   PENDING     → CONFIRMED  | IN_PROGRESS | CANCELLED
+     *   CONFIRMED   → IN_PROGRESS | CANCELLED
+     *   IN_PROGRESS → COMPLETED  | CANCELLED
+     *   COMPLETED   → (terminal)
+     *   CANCELLED   → (terminal)
      * </pre>
      */
     private void validateStatusTransition(ServiceOrderStatus current, ServiceOrderStatus next) {
@@ -212,7 +281,10 @@ public class ServiceOrderService {
             return;
         }
         boolean valid = switch (current) {
-            case PENDING     -> next == ServiceOrderStatus.IN_PROGRESS || next == ServiceOrderStatus.CANCELLED;
+            case PENDING     -> next == ServiceOrderStatus.CONFIRMED
+                                || next == ServiceOrderStatus.IN_PROGRESS
+                                || next == ServiceOrderStatus.CANCELLED;
+            case CONFIRMED   -> next == ServiceOrderStatus.IN_PROGRESS || next == ServiceOrderStatus.CANCELLED;
             case IN_PROGRESS -> next == ServiceOrderStatus.COMPLETED   || next == ServiceOrderStatus.CANCELLED;
             case COMPLETED, CANCELLED -> false;
         };
@@ -266,15 +338,19 @@ public class ServiceOrderService {
     private ServiceOrderResponseDto enrich(ServiceOrder order) {
         GuestDto guest = null;
         RoomDto room = null;
-        try {
-            guest = guestReservationClient.getGuestById(order.getGuestId());
-        } catch (Exception e) {
-            log.warn("Failed to enrich guest id={}: {}", order.getGuestId(), e.getMessage());
+        if (order.getGuestId() != null) {
+            try {
+                guest = guestReservationClient.getGuestById(order.getGuestId());
+            } catch (Exception e) {
+                log.warn("Failed to enrich guest id={}: {}", order.getGuestId(), e.getMessage());
+            }
         }
-        try {
-            room = roomServiceClient.getRoomById(order.getRoomId());
-        } catch (Exception e) {
-            log.warn("Failed to enrich room id={}: {}", order.getRoomId(), e.getMessage());
+        if (order.getRoomId() != null) {
+            try {
+                room = roomServiceClient.getRoomById(order.getRoomId());
+            } catch (Exception e) {
+                log.warn("Failed to enrich room id={}: {}", order.getRoomId(), e.getMessage());
+            }
         }
         return ServiceOrderMapper.toResponseDto(order, guest, room);
     }

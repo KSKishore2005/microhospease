@@ -34,8 +34,14 @@ import java.util.stream.Collectors;
 @Transactional
 public class InvoiceService {
 
+    /**
+     * Only service orders the guest has actually committed to and that the hotel
+     * has actually delivered (or is mid-delivery) get billed. PENDING orders are
+     * unconfirmed requests that may yet be cancelled — billing them would let
+     * guests be charged for things that never happened.
+     */
     private static final Set<String> CHARGEABLE_ORDER_STATUSES =
-            Set.of("PENDING", "IN_PROGRESS", "COMPLETED");
+            Set.of("CONFIRMED", "IN_PROGRESS", "COMPLETED");
 
     private final InvoiceRepository invoiceRepository;
     private final PaymentRepository paymentRepository;
@@ -213,15 +219,32 @@ public class InvoiceService {
         if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
             throw new BadRequestException("Cannot mark a CANCELLED invoice as PAID");
         }
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            return enrich(invoice); // idempotent
+        }
+
+        // A manual "mark paid" is only valid when the ledger actually has
+        // successful payments covering the invoice total. Otherwise the books
+        // and the cashbox disagree.
+        BigDecimal collected = paymentRepository.sumSuccessfulPaymentsForInvoice(id);
+        if (collected == null) collected = BigDecimal.ZERO;
+        if (collected.compareTo(invoice.getTotalAmount()) < 0) {
+            throw new BadRequestException(
+                    "Cannot mark invoice as PAID — payments collected (" + collected
+                            + ") do not cover the total amount (" + invoice.getTotalAmount() + ").");
+        }
+
         invoice.setStatus(InvoiceStatus.PAID);
         return enrich(invoiceRepository.save(invoice));
     }
 
     public InvoiceResponseDto markAsOverdue(Long id) {
         Invoice invoice = findEntityById(id);
-        if (invoice.getStatus() != InvoiceStatus.UNPAID) {
-            throw new BadRequestException("Only UNPAID invoices can be marked OVERDUE; current: "
-                    + invoice.getStatus());
+        // PAID or CANCELLED invoices can't go OVERDUE; OVERDUE itself is idempotent.
+        if (invoice.getStatus() == InvoiceStatus.PAID
+                || invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            throw new BadRequestException(
+                    "Cannot mark a " + invoice.getStatus() + " invoice as OVERDUE.");
         }
         invoice.setStatus(InvoiceStatus.OVERDUE);
         return enrich(invoiceRepository.save(invoice));
@@ -232,6 +255,18 @@ public class InvoiceService {
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             throw new BadRequestException("Cannot cancel a PAID invoice");
         }
+        if (invoice.getStatus() == InvoiceStatus.CANCELLED) {
+            return enrich(invoice); // idempotent
+        }
+
+        // Refuse to cancel if there are successful, unrefunded payments
+        BigDecimal unrefunded = paymentRepository.sumSuccessfulPaymentsForInvoice(id);
+        if (unrefunded != null && unrefunded.signum() > 0) {
+            throw new BadRequestException(
+                    "Cannot cancel invoice with unrefunded payments totalling "
+                            + unrefunded + ". Refund them first.");
+        }
+
         invoice.setStatus(InvoiceStatus.CANCELLED);
         return enrich(invoiceRepository.save(invoice));
     }

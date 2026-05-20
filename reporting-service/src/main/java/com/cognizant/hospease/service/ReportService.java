@@ -149,8 +149,12 @@ public class ReportService {
                     ? staff.getName() + " (id=" + staff.getUserId() + ")"
                     : "Staff ID: " + report.getGeneratedByStaffId();
             String scope = report.getScope() != null ? report.getScope().name() : "GENERAL";
-            return pdfGeneratorService.generateReportPdf(
+            pdfGeneratorService.generateReportPdf(
                     fileName, report.getReportType(), scope, staffLabel, report.getContentSummary());
+
+            // Return a gateway-accessible URL rather than the local filesystem path.
+            // The frontend can fetch this URL (with the JWT) via the download endpoint.
+            return "/api/reports/" + report.getReportId() + "/download";
         } catch (Exception e) {
             log.error("PDF generation failed for reportId={}: {}",
                     report.getReportId(), e.getMessage());

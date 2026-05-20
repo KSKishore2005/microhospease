@@ -18,7 +18,8 @@ public class Shift {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long shiftId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    /** EAGER — avoids LazyInitializationException when serializing outside a tx */
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "staff_id", nullable = false)
     private Staff staff;
 
@@ -31,7 +32,15 @@ public class Shift {
     @Column(name = "assigned_by")
     private Long assignedByUserId;
 
+    /** MORNING | AFTERNOON | NIGHT — frontend StaffScheduling reads shift.shiftType */
+    @Column(name = "shift_type", length = 20)
+    private String shiftType;
+
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
     @Builder.Default
     private ShiftStatus status = ShiftStatus.SCHEDULED;
 }

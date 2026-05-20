@@ -16,6 +16,12 @@ import java.util.Optional;
 @Repository
 public interface GuestRepository extends JpaRepository<Guest, Long> {
 
+    /** Case-insensitive — email is treated as a unique identifier. */
+    Optional<Guest> findByEmailIgnoreCase(String email);
+
+    boolean existsByEmailIgnoreCase(String email);
+
+    /** Kept for backward compatibility with any callers expecting an exact match. */
     Optional<Guest> findByEmail(String email);
 
     boolean existsByEmail(String email);

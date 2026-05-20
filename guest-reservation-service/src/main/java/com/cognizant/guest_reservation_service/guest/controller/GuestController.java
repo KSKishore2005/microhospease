@@ -35,7 +35,7 @@ public class GuestController {
     }
 
     @GetMapping("/email/{email}")
-    @RoleRequired({"FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"GUEST", "FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR"})
     public ResponseEntity<GuestResponseDto> getGuestByEmail(@PathVariable String email) {
         return ResponseEntity.ok(guestService.getGuestByEmail(email));
     }
@@ -58,6 +58,21 @@ public class GuestController {
             @Valid @RequestBody GuestRequestDto requestDto) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(guestService.createGuest(requestDto));
+    }
+
+    /**
+     * Idempotent "ensure my profile exists" endpoint. Returns the existing guest
+     * by email (case-insensitive) or creates a minimal one — never errors out
+     * on "already exists". Used by the frontend on first guest-area page load.
+     */
+    @PostMapping("/upsert")
+    @RoleRequired({"GUEST", "FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR"})
+    public ResponseEntity<GuestResponseDto> upsertGuest(
+            @Valid @RequestBody GuestRequestDto requestDto) {
+        return ResponseEntity.ok(guestService.upsertByEmail(
+                requestDto.getName(),
+                requestDto.getEmail(),
+                requestDto.getPhone()));
     }
 
     @PutMapping("/{id}")

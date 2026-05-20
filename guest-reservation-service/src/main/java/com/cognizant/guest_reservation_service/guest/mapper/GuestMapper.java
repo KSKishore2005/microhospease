@@ -63,7 +63,13 @@ public class GuestMapper {
     public void updateEntity(Guest existing, GuestRequestDto dto) {
         existing.setName(dto.getName());
         existing.setEmail(dto.getEmail());
-        existing.setPhone(dto.getPhone());
+        // Mirror createGuest's phone hygiene: accept null or 7–20 char strings, reject the rest.
+        if (dto.getPhone() == null || dto.getPhone().isBlank()) {
+            existing.setPhone(null);
+        } else if (dto.getPhone().length() >= 7 && dto.getPhone().length() <= 20) {
+            existing.setPhone(dto.getPhone());
+        }
+        // (out-of-range phones are silently skipped instead of overwriting a valid stored value)
         existing.setDob(dto.getDob());
         if (dto.getLoyaltyTier() != null) existing.setLoyaltyTier(dto.getLoyaltyTier());
         if (dto.getStatus() != null)      existing.setStatus(dto.getStatus());

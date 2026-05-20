@@ -10,6 +10,7 @@ import com.cognizant.user_service.repository.UserRepository;
 import com.cognizant.user_service.security.JwtTokenProvider;
 import com.cognizant.user_service.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,9 +19,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Set;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+
+    /**
+     * Roles a user is allowed to self-assign via the public /register endpoint.
+     * Privileged roles (ADMINISTRATOR, MANAGER, etc.) can only be assigned by an
+     * existing administrator through POST /api/users or POST /api/users/{id}/assign-role.
+     */
+    private static final Set<String> SELF_REGISTERABLE_ROLES = Set.of("GUEST");
 
     private final UserRepository userRepository;
     private final AuditLogService auditLogService; // ✅ FIXED
@@ -39,9 +50,15 @@ public class AuthService {
                     "Email is already registered: " + request.getEmail());
         }
 
-        String role = (request.getRole() != null && !request.getRole().isBlank())
-                ? request.getRole().toUpperCase()
-                : "GUEST";
+        // The public /register endpoint can only create GUEST accounts. If a request
+        // sneaks in a privileged role (ADMINISTRATOR, MANAGER, …), silently coerce
+        // it down to GUEST rather than handing out admin to anyone who asks.
+        String requested = request.getRole() != null ? request.getRole().toUpperCase() : "";
+        String role = SELF_REGISTERABLE_ROLES.contains(requested) ? requested : "GUEST";
+        if (!requested.isBlank() && !role.equals(requested)) {
+            log.warn("Rejected self-register role '{}' for email {}, defaulting to GUEST",
+                    requested, request.getEmail());
+        }
 
         User user = new User();
         user.setName(request.getName());
@@ -72,13 +89,21 @@ public class AuthService {
                         request.getEmail(), request.getPassword()));
 
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        String token = jwtTokenProvider.generateToken(principal);
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "User not found with email: " + request.getEmail()));
 
-        // ✅ LOG (DECOUPLED)
+        // Reject disabled accounts explicitly BEFORE minting a token. Spring's
+        // DaoAuthenticationProvider doesn't call isEnabled() reliably for every
+        // configuration, so the JWT could otherwise be issued to an INACTIVE user
+        // and only get rejected later at validate/refresh time.
+        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            throw new IllegalArgumentException("Account is not active.");
+        }
+
+        String token = jwtTokenProvider.generateToken(principal);
+
         writeAuditLog(user.getUserId(), user.getName(),
                 "LOGIN", "USER", user.getUserId());
 
@@ -90,14 +115,19 @@ public class AuthService {
             token = token.substring(7);
         }
 
-        boolean isValid = jwtTokenProvider.validateToken(token);
-        if (!isValid) {
+        if (!jwtTokenProvider.validateToken(token)) {
             return TokenValidationResponse.builder().valid(false).build();
         }
 
         String email = jwtTokenProvider.getEmailFromToken(token);
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        // Token is cryptographically valid but the underlying user has been
+        // deleted or disabled — reject so admins can revoke access immediately
+        // without waiting for token expiry.
+        if (user == null || !"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            return TokenValidationResponse.builder().valid(false).build();
+        }
 
         return TokenValidationResponse.builder()
                 .valid(true)
@@ -136,8 +166,16 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
 
+        // Disabled accounts must not be able to mint fresh tokens from a stale one.
+        if (!"ACTIVE".equalsIgnoreCase(user.getStatus())) {
+            throw new IllegalArgumentException("Account is not active.");
+        }
+
         UserPrincipal principal = new UserPrincipal(user);
         String newToken = jwtTokenProvider.generateToken(principal);
+
+        writeAuditLog(user.getUserId(), user.getName(),
+                "REFRESH_TOKEN", "USER", user.getUserId());
 
         return buildResponse(newToken, user);
     }
@@ -169,8 +207,8 @@ public class AuthService {
                     "{\"source\":\"AuthService\"}"
             );
         } catch (Exception e) {
-            // 🔥 VERY IMPORTANT: do not break login/register
-            System.out.println("Audit log failed: " + e.getMessage());
+            // Never let an audit-log failure break login/register/refresh.
+            log.warn("Audit log failed for userId={} action={}: {}", userId, action, e.getMessage());
         }
     }
 }

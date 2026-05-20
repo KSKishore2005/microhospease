@@ -30,6 +30,7 @@ public class HousekeepingTask {
     private LocalDateTime completedAt;
 
     @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
     @Builder.Default
     private HousekeepingStatus status = HousekeepingStatus.PENDING;
 }

@@ -20,6 +20,7 @@ public class ReportRequestDto {
     @Size(max = 100, message = "reportType must be at most 100 characters")
     private String reportType;
 
+    @NotNull(message = "scope is required")
     private ReportScope scope;
 
     @NotNull(message = "generatedByStaffId is required")

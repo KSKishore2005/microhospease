@@ -58,10 +58,45 @@ public class RoomService {
         return roomRepository.save(existing);
     }
 
+    /**
+     * Updates a room's physical state. Transitions are validated against a state
+     * machine so other services (reservation, housekeeping) cannot drive the room
+     * into an invalid combination such as OCCUPIED + CLEANING simultaneously.
+     *
+     * Allowed transitions:
+     *   AVAILABLE   → OCCUPIED | CLEANING | MAINTENANCE
+     *   OCCUPIED    → CLEANING | MAINTENANCE | AVAILABLE (e.g. cancellation)
+     *   CLEANING    → AVAILABLE | MAINTENANCE
+     *   MAINTENANCE → AVAILABLE
+     */
     public Room updateRoomStatus(Long id, RoomStatus status) {
         Room room = getRoomById(id);
+        RoomStatus current = room.getStatus();
+        if (current != null && current != status && !isValidTransition(current, status)) {
+            throw new BadRequestException(
+                    "Invalid room status transition: " + current + " -> " + status);
+        }
         room.setStatus(status);
         return roomRepository.save(room);
+    }
+
+    private boolean isValidTransition(RoomStatus from, RoomStatus to) {
+        // Same-state transitions are guarded by the equality check in the caller
+        // (`current != status`), so listing them here would never be reached —
+        // but listing MAINTENANCE explicitly is a defensive belt-and-braces in
+        // case a caller forgets that guard.
+        return switch (from) {
+            case AVAILABLE   -> to == RoomStatus.OCCUPIED
+                                || to == RoomStatus.CLEANING
+                                || to == RoomStatus.MAINTENANCE;
+            case OCCUPIED    -> to == RoomStatus.CLEANING
+                                || to == RoomStatus.MAINTENANCE
+                                || to == RoomStatus.AVAILABLE;
+            case CLEANING    -> to == RoomStatus.AVAILABLE
+                                || to == RoomStatus.MAINTENANCE;
+            case MAINTENANCE -> to == RoomStatus.AVAILABLE
+                                || to == RoomStatus.MAINTENANCE;
+        };
     }
 
     public void deleteRoom(Long id) {

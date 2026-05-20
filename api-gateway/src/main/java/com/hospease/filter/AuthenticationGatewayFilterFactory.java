@@ -1,6 +1,7 @@
-package com.hospease.apigateway.filter;
+package com.hospease.filter;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -13,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.util.Date;
 
 @Component
 @Slf4j
@@ -55,14 +57,35 @@ public class AuthenticationGatewayFilterFactory
                         .build()
                         .parseSignedClaims(token)
                         .getPayload();
+
+                // Explicit expiration check
+                Date exp = claims.getExpiration();
+                if (exp != null && exp.before(new Date())) {
+                    log.warn("Expired JWT at gateway: expired at {}", exp);
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                }
+
                 log.debug("Gateway validated token for user '{}'", claims.getSubject());
+            } catch (ExpiredJwtException e) {
+                log.warn("Expired JWT at gateway: {}", e.getMessage());
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
             } catch (Exception e) {
                 log.warn("Invalid JWT at gateway: {}", e.getMessage());
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
                 return exchange.getResponse().setComplete();
             }
 
-            return chain.filter(exchange);
+            // Explicitly forward the original Authorization header to downstream services.
+            // Spring Cloud Gateway preserves headers by default but being explicit prevents
+            // surprises when filter ordering changes.
+            final String authToForward = authHeader;
+            return chain.filter(
+                    exchange.mutate()
+                            .request(r -> r.header(HttpHeaders.AUTHORIZATION, authToForward))
+                            .build()
+            );
         };
     }
 

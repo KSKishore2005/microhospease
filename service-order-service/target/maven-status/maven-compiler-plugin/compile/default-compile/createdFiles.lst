@@ -27,5 +27,6 @@ com\cognizant\services_service\security\UniversalRoleInterceptor.class
 com\cognizant\services_service\client\dto\ReservationDto.class
 com\cognizant\services_service\model\ServiceOrder.class
 com\cognizant\services_service\model\ServiceType.class
+com\cognizant\services_service\config\FeignJwtInterceptor.class
 com\cognizant\services_service\security\RoleRequired.class
 com\cognizant\services_service\client\dto\GuestDto.class

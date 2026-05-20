@@ -86,7 +86,11 @@ public class AuditLogController {
         auditLog.setUserId(dto.getUserId());
         auditLog.setAction(dto.getAction());
         auditLog.setResourceType(dto.getResourceType());
-        auditLog.setResourceId(dto.getResourceId());
+        // DTO resourceId is String; entity is Long — parse safely
+        if (dto.getResourceId() != null && !dto.getResourceId().isBlank()) {
+            try { auditLog.setResourceId(Long.parseLong(dto.getResourceId())); }
+            catch (NumberFormatException ignored) { /* non-numeric id – leave null */ }
+        }
         auditLog.setDetailsJson(dto.getDetailsJson());
 
         return auditLog;
@@ -101,7 +105,8 @@ public class AuditLogController {
         dto.setUserName(auditLog.getUserName());
         dto.setAction(auditLog.getAction());
         dto.setResourceType(auditLog.getResourceType());
-        dto.setResourceId(auditLog.getResourceId());
+        // Entity resourceId is Long; DTO is String — convert to string
+        dto.setResourceId(auditLog.getResourceId() != null ? String.valueOf(auditLog.getResourceId()) : null);
         dto.setDetailsJson(auditLog.getDetailsJson());
         dto.setTimestamp(auditLog.getTimestamp());
 

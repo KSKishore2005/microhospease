@@ -96,6 +96,43 @@ public class UserService {
 
     public void deleteUser(Long id) {
         User user = getUserById(id);
+
+        // Don't let the system delete its last administrator — otherwise nobody
+        // can ever reach the admin endpoints again.
+        if ("ADMINISTRATOR".equalsIgnoreCase(user.getRole())) {
+            long remainingAdmins = userRepository.findAll().stream()
+                    .filter(u -> "ADMINISTRATOR".equalsIgnoreCase(u.getRole()))
+                    .filter(u -> !u.getUserId().equals(id))
+                    .filter(u -> "ACTIVE".equalsIgnoreCase(u.getStatus()))
+                    .count();
+            if (remainingAdmins == 0) {
+                throw new IllegalStateException(
+                        "Cannot delete the last active ADMINISTRATOR account.");
+            }
+        }
+
         userRepository.delete(user);
+        writeAuditLog(user.getUserId(), user.getName(),
+                "DELETE_USER", "USER", user.getUserId(), "{}");
+    }
+
+    /**
+     * Prevent the last admin from accidentally demoting themselves to GUEST.
+     */
+    public User assignRoleSafe(Long id, String newRole) {
+        User user = getUserById(id);
+        if ("ADMINISTRATOR".equalsIgnoreCase(user.getRole())
+                && !"ADMINISTRATOR".equalsIgnoreCase(newRole)) {
+            long otherAdmins = userRepository.findAll().stream()
+                    .filter(u -> "ADMINISTRATOR".equalsIgnoreCase(u.getRole()))
+                    .filter(u -> !u.getUserId().equals(id))
+                    .filter(u -> "ACTIVE".equalsIgnoreCase(u.getStatus()))
+                    .count();
+            if (otherAdmins == 0) {
+                throw new IllegalStateException(
+                        "Cannot demote the last active ADMINISTRATOR.");
+            }
+        }
+        return assignRole(id, newRole);
     }
 }

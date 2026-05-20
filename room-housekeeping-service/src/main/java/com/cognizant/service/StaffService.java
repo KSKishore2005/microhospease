@@ -38,10 +38,14 @@ public class StaffService {
 
     public Staff updateStaff(Long id, Staff updated) {
         Staff existing = getStaffById(id);
-        existing.setRole(updated.getRole());
-        existing.setDepartment(updated.getDepartment());
-        existing.setContactInfoJson(updated.getContactInfoJson());
-        existing.setStatus(updated.getStatus());
+        if (updated.getName() != null)       existing.setName(updated.getName());
+        if (updated.getRole() != null)        existing.setRole(updated.getRole());
+        if (updated.getDepartment() != null)  existing.setDepartment(updated.getDepartment());
+        if (updated.getPhone() != null)       existing.setPhone(updated.getPhone());
+        if (updated.getEmail() != null)       existing.setEmail(updated.getEmail());
+        if (updated.getHireDate() != null)    existing.setHireDate(updated.getHireDate());
+        if (updated.getContactInfoJson() != null) existing.setContactInfoJson(updated.getContactInfoJson());
+        if (updated.getStatus() != null)      existing.setStatus(updated.getStatus());
         return staffRepository.save(existing);
     }
 

@@ -15,7 +15,7 @@ public class AuditLogResponseDTO {
     private String userName;
     private String action;
     private String resourceType;
-    private Long resourceId;
+    private String resourceId;   // String so frontend type matches runtime value
     private String detailsJson;
     private LocalDateTime timestamp;
 }

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Slf4j
@@ -50,17 +51,25 @@ public class PaymentService {
     }
 
     /**
-     * STRICT payment: amount must equal the invoice's remaining balance.
-     * On success, marks invoice PAID and payment SUCCESS.
+     * Accepts a payment against an invoice. Supports partial payments and multiple
+     * installments — the invoice is only marked PAID when cumulative successful
+     * payments meet or exceed the invoice total. Overpayments are rejected so the
+     * books stay clean (a separate "refund" flow would handle tips/adjustments).
      */
     public Payment createPayment(Payment payment, Long invoiceId, Long guestId) {
         log.info("Creating payment for invoiceId={}, guestId={}, amount={}",
                 invoiceId, guestId, payment.getAmount());
 
-        Invoice invoice = invoiceRepository.findById(invoiceId)
+        if (payment.getAmount() == null || payment.getAmount().signum() <= 0) {
+            throw new BadRequestException("Payment amount must be greater than zero.");
+        }
+
+        // Pessimistic lock prevents two concurrent payments from both observing
+        // the same remaining balance and double-applying. The lock is released
+        // when the @Transactional method commits.
+        Invoice invoice = invoiceRepository.findByIdForUpdate(invoiceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice", "id", invoiceId));
 
-        // Block payments on terminal invoice states
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             throw new BadRequestException("Invoice " + invoiceId + " is already PAID");
         }
@@ -68,35 +77,51 @@ public class PaymentService {
             throw new BadRequestException("Cannot pay a CANCELLED invoice");
         }
 
-        // Guest must match the invoice's guest
         if (!invoice.getGuestId().equals(guestId)) {
             throw new BadRequestException(
                     "Guest " + guestId + " does not own invoice " + invoiceId
                             + " (owned by guest " + invoice.getGuestId() + ")");
         }
 
-        // STRICT match: payment amount must equal remaining balance
         BigDecimal alreadyPaid = paymentRepository.sumSuccessfulPaymentsForInvoice(invoiceId);
-        BigDecimal balance = invoice.getTotalAmount().subtract(alreadyPaid);
+        if (alreadyPaid == null) alreadyPaid = BigDecimal.ZERO;
+        // Force a consistent 2-decimal scale on both operands so compareTo never
+        // mis-fires due to scale drift (e.g. SUM(amount) returning scale=10).
+        BigDecimal balance = invoice.getTotalAmount()
+                .setScale(2, RoundingMode.HALF_UP)
+                .subtract(alreadyPaid.setScale(2, RoundingMode.HALF_UP));
 
-        if (payment.getAmount().compareTo(balance) != 0) {
+        if (balance.signum() <= 0) {
+            // Defensive: the invoice is fully covered already but isn't marked PAID.
+            invoice.setStatus(InvoiceStatus.PAID);
+            invoiceRepository.save(invoice);
+            throw new BadRequestException("Invoice " + invoiceId + " already fully paid.");
+        }
+
+        // Reject overpayments — the system has no concept of credit balances.
+        if (payment.getAmount().compareTo(balance) > 0) {
             throw new BadRequestException(
                     "Payment amount " + payment.getAmount()
-                            + " does not match remaining balance " + balance
-                            + " (totalAmount=" + invoice.getTotalAmount()
-                            + ", alreadyPaid=" + alreadyPaid + ")");
+                            + " exceeds remaining balance " + balance
+                            + ". Either pay <= balance, or issue a refund afterwards.");
         }
 
         payment.setInvoice(invoice);
         payment.setGuestId(guestId);
         payment.setStatus(PaymentStatus.SUCCESS);
-
-        // Mark invoice paid
-        invoice.setStatus(InvoiceStatus.PAID);
-        invoiceRepository.save(invoice);
-
         Payment saved = paymentRepository.save(payment);
-        log.info("Payment created id={}, invoice {} marked PAID", saved.getPaymentId(), invoiceId);
+
+        // If this payment closes out the balance, mark the invoice PAID.
+        BigDecimal newTotalPaid = alreadyPaid.add(payment.getAmount());
+        if (newTotalPaid.compareTo(invoice.getTotalAmount()) >= 0) {
+            invoice.setStatus(InvoiceStatus.PAID);
+            invoiceRepository.save(invoice);
+            log.info("Invoice {} fully PAID (cumulative {})", invoiceId, newTotalPaid);
+        } else {
+            log.info("Partial payment recorded for invoice {}: paid {} / {}",
+                    invoiceId, newTotalPaid, invoice.getTotalAmount());
+        }
+
         return saved;
     }
 
@@ -127,13 +152,23 @@ public class PaymentService {
                     "Only SUCCESS payments can be refunded; current: " + payment.getStatus());
         }
         payment.setStatus(PaymentStatus.REFUNDED);
+        Payment saved = paymentRepository.save(payment);
 
+        // Reconcile the invoice based on remaining successful payments.
+        // If still fully covered → stay PAID; if partial → UNPAID; if zero → UNPAID.
         Invoice invoice = payment.getInvoice();
-        if (invoice != null) {
-            invoice.setStatus(InvoiceStatus.UNPAID);
+        if (invoice != null && invoice.getStatus() != InvoiceStatus.CANCELLED) {
+            BigDecimal remaining = paymentRepository.sumSuccessfulPaymentsForInvoice(invoice.getInvoiceId());
+            if (remaining == null) remaining = BigDecimal.ZERO;
+
+            if (remaining.compareTo(invoice.getTotalAmount()) >= 0) {
+                invoice.setStatus(InvoiceStatus.PAID);
+            } else {
+                invoice.setStatus(InvoiceStatus.UNPAID);
+            }
             invoiceRepository.save(invoice);
         }
-        return paymentRepository.save(payment);
+        return saved;
     }
 
     public void deletePayment(Long id) {

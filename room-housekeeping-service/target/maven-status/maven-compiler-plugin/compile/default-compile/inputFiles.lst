@@ -7,6 +7,10 @@ C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservic
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\dto\HousekeepingTaskResponseDto.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\dto\RoomRequestDto.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\dto\RoomResponseDto.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\dto\ShiftRequestDto.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\dto\ShiftResponseDto.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\dto\StaffRequestDto.java
+C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\dto\StaffResponseDto.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\entity\HousekeepingTask.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\entity\Room.java
 C:\Users\2484903\Downloads\HospEase-Microservices-extracted\HospEase-Microservices\room-housekeeping-service\src\main\java\com\cognizant\entity\Shift.java

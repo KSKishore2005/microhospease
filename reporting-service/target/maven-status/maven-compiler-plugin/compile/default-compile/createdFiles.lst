@@ -49,6 +49,7 @@ com\cognizant\hospease\entity\KPI.class
 com\cognizant\hospease\client\dto\InvoiceDto.class
 com\cognizant\hospease\client\UserServiceClient.class
 com\cognizant\hospease\dto\AuditPackageResponseDto.class
+com\cognizant\hospease\config\FeignJwtInterceptor.class
 com\cognizant\hospease\security\LocalSecurityConfig.class
 com\cognizant\hospease\service\PdfGeneratorService.class
 com\cognizant\hospease\client\fallback\FinanceClientFallback.class

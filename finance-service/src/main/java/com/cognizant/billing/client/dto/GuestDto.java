@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 public class GuestDto {
     private Long guestId;
     private String name;
+    private String email;
     private String loyaltyTier;
     private String status;
 }

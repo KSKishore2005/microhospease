@@ -31,4 +31,12 @@ public class KPI {
 
     @Column(length = 50)
     private String reportingPeriod;
+
+    /**
+     * Optimistic-lock counter — prevents two concurrent KPI calculations from
+     * silently overwriting each other's currentValue write. The losing write
+     * gets a Hibernate OptimisticLockException which Spring maps to 409.
+     */
+    @Version
+    private Long version;
 }

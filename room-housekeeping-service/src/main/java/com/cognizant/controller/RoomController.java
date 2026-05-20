@@ -63,16 +63,26 @@ public class RoomController {
                 .toList());
     }
 
+    /**
+     * Checks if a room is currently bookable. NOTE: room-service is the source of truth
+     * for room *physical* status only — guest-reservation-service is responsible for
+     * cross-checking against existing reservations in the [from, to] window. The date
+     * params are accepted for API forward-compatibility but are intentionally not used
+     * here; callers needing date-range checks should query the reservation service.
+     */
     @GetMapping("/{id}/availability")
     @RoleRequired({"GUEST", "FRONT_DESK_STAFF", "HOUSEKEEPING_STAFF", "MANAGER", "ADMINISTRATOR", "AUDITOR", "FINANCE_OFFICER"})
     public ResponseEntity<Boolean> checkAvailability(
             @PathVariable Long id,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
 
         Room room = roomService.getRoomById(id);
-        boolean isAvailable = room.getStatus() == RoomStatus.AVAILABLE;
-        return ResponseEntity.ok(isAvailable);
+        // A room is "bookable" if it is not currently under maintenance.
+        // OCCUPIED rooms can still be reserved for a future date range; the reservation
+        // service must do the real overlap check.
+        boolean isBookable = room.getStatus() != RoomStatus.MAINTENANCE;
+        return ResponseEntity.ok(isBookable);
     }
 
     @PostMapping

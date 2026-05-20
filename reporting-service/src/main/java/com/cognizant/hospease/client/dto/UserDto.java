@@ -13,4 +13,7 @@ public class UserDto {
     private String email;
     private String role;
     private String status;
+
+    /** Frontend reads staff?.id — mirror userId so the field resolves. */
+    public Long getId() { return userId; }
 }

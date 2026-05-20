@@ -30,6 +30,7 @@ public final class ServiceOrderMapper {
                 .description(o.getDescription())
                 .price(o.getPrice())
                 .status(o.getStatus())
+                .assignedToUserId(o.getAssignedToUserId())
                 .createdAt(o.getCreatedAt())
                 .updatedAt(o.getUpdatedAt())
                 .guest(guest)

@@ -28,6 +28,11 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
     open-in-view: false
 
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      write-date-timestamps-as-nanoseconds: false
+
   # IMPORTANT: schema.sql/data.sql disabled. Hibernate handles the schema via ddl-auto.
   # Re-enable only if you want to seed sample data; data.sql will run on every startup.
   sql:

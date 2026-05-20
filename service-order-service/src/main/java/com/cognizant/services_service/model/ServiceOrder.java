@@ -14,7 +14,8 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_service_orders_guest", columnList = "guestId"),
                 @Index(name = "idx_service_orders_reservation", columnList = "reservationId"),
                 @Index(name = "idx_service_orders_room", columnList = "roomId"),
-                @Index(name = "idx_service_orders_status", columnList = "status")
+                @Index(name = "idx_service_orders_status", columnList = "status"),
+                @Index(name = "idx_service_orders_assignee", columnList = "assignedToUserId")
         })
 @Data
 @NoArgsConstructor
@@ -26,17 +27,17 @@ public class ServiceOrder {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long orderId;
 
-    @Column(nullable = false)
+    @Column
     private Long guestId;
 
     /**
-     * NEW: Links the service order to a specific reservation.
-     * Required so finance-service can roll service charges into the correct invoice.
+     * Links the service order to a specific reservation (optional for walk-in / maintenance orders).
+     * Finance-service uses this to roll service charges into the correct invoice when set.
      */
-    @Column(nullable = false)
+    @Column
     private Long reservationId;
 
-    @Column(nullable = false)
+    @Column
     private Long roomId;
 
     @Enumerated(EnumType.STRING)
@@ -56,6 +57,13 @@ public class ServiceOrder {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private ServiceOrderStatus status;
+
+    /**
+     * Staff member currently responsible for fulfilling this order. Set when a
+     * service-staff user accepts the order from the queue. Null = unassigned (in queue).
+     */
+    @Column
+    private Long assignedToUserId;
 
     @CreationTimestamp
     @Column(updatable = false)

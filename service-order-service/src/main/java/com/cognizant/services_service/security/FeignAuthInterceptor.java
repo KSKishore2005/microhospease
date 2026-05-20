@@ -3,16 +3,13 @@ package com.cognizant.services_service.security;
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * Forwards the caller's Authorization header (Bearer token) to every
- * downstream Feign call. Without this, downstream services see no token
- * and reject the call with 401/403.
+ * DEPRECATED — superseded by {@link com.cognizant.services_service.config.FeignJwtInterceptor}.
+ * Intentionally NOT a Spring bean to prevent double registration with FeignJwtInterceptor.
  */
-@Configuration
 public class FeignAuthInterceptor implements RequestInterceptor {
 
     @Override

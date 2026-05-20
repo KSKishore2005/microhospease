@@ -59,6 +59,37 @@ public class ServiceOrderController {
         return ResponseEntity.ok(serviceOrderService.getOrdersByStatus(status));
     }
 
+    /** Orders this specific service-staff member is responsible for. */
+    @GetMapping("/assignee/{userId}")
+    @RoleRequired({"RESTAURANT_SERVICE_STAFF", "HOUSEKEEPING_STAFF", "FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR", "AUDITOR"})
+    public ResponseEntity<List<ServiceOrderResponseDto>> getOrdersByAssignee(@PathVariable Long userId) {
+        return ResponseEntity.ok(serviceOrderService.getOrdersByAssignee(userId));
+    }
+
+    /** The unassigned PENDING queue — any service-staff can pick from here. */
+    @GetMapping("/queue")
+    @RoleRequired({"RESTAURANT_SERVICE_STAFF", "HOUSEKEEPING_STAFF", "FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR"})
+    public ResponseEntity<List<ServiceOrderResponseDto>> getUnassignedQueue() {
+        return ResponseEntity.ok(serviceOrderService.getUnassignedOpenOrders());
+    }
+
+    @PatchMapping("/{id}/assign")
+    @RoleRequired({"RESTAURANT_SERVICE_STAFF", "HOUSEKEEPING_STAFF", "FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR"})
+    public ResponseEntity<ServiceOrderResponseDto> assignOrder(
+            @PathVariable Long id,
+            @RequestParam Long userId) {
+        return ResponseEntity.ok(serviceOrderService.assignOrder(id, userId));
+    }
+
+    /** One-shot: assign-to-me and start (PENDING → IN_PROGRESS). */
+    @PatchMapping("/{id}/accept")
+    @RoleRequired({"RESTAURANT_SERVICE_STAFF", "HOUSEKEEPING_STAFF", "FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR"})
+    public ResponseEntity<ServiceOrderResponseDto> acceptOrder(
+            @PathVariable Long id,
+            @RequestParam Long userId) {
+        return ResponseEntity.ok(serviceOrderService.acceptOrder(id, userId));
+    }
+
     @PostMapping
     @RoleRequired({"GUEST", "FRONT_DESK_STAFF", "RESTAURANT_SERVICE_STAFF", "MANAGER", "ADMINISTRATOR"})
     public ResponseEntity<ServiceOrderResponseDto> createOrder(

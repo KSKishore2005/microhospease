@@ -82,15 +82,16 @@ public class KPIService {
                     .filter(r -> "OCCUPIED".equalsIgnoreCase(r.getStatus()))
                     .count();
 
+            BigDecimal occupancy;
             if (total > 0) {
-                BigDecimal occupancy = BigDecimal.valueOf((double) occupied / total * 100)
+                occupancy = BigDecimal.valueOf((double) occupied / total * 100)
                         .setScale(2, RoundingMode.HALF_UP);
-                kpi.setCurrentValue(occupancy);
                 log.info("Occupancy for KPI {}: {}/{} = {}%", kpiId, occupied, total, occupancy);
             } else {
-                log.warn("No rooms returned from room-service for KPI {}", kpiId);
-                throw new RuntimeException("Occupancy calculation skipped: no room data available");
+                occupancy = BigDecimal.ZERO;
+                log.warn("No rooms available — occupancy KPI {} set to 0", kpiId);
             }
+            kpi.setCurrentValue(occupancy);
             return DtoMapper.toKPIResponseDto(kpiRepository.save(kpi));
         } catch (RuntimeException e) {
             throw e;
@@ -139,15 +140,16 @@ public class KPIService {
                             && !"CANCELLED".equalsIgnoreCase(i.getStatus()))
                     .count();
 
+            BigDecimal rate;
             if (total > 0) {
-                BigDecimal rate = BigDecimal.valueOf((double) paid / total * 100)
+                rate = BigDecimal.valueOf((double) paid / total * 100)
                         .setScale(2, RoundingMode.HALF_UP);
-                kpi.setCurrentValue(rate);
                 log.info("Payment collection for KPI {}: {}/{} = {}%", kpiId, paid, total, rate);
             } else {
-                log.warn("No invoices returned from finance-service for KPI {}", kpiId);
-                throw new RuntimeException("Collection rate calculation skipped: no invoice data available");
+                rate = BigDecimal.ZERO;
+                log.warn("No active invoices — collection-rate KPI {} set to 0", kpiId);
             }
+            kpi.setCurrentValue(rate);
             return DtoMapper.toKPIResponseDto(kpiRepository.save(kpi));
         } catch (RuntimeException e) {
             throw e;

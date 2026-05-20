@@ -12,6 +12,6 @@ public class AuditLogRequestDTO {
     private Long userId;
     private String action;
     private String resourceType;
-    private Long resourceId;
+    private String resourceId;   // String – frontend sends IDs as strings
     private String detailsJson;
 }

@@ -4,19 +4,70 @@ server:
 spring:
   application:
     name: api-gateway
-
-  config:
-    import: "optional:configserver:http://localhost:8888"
-
   cloud:
+    config:
+      enabled: false
     gateway:
       routes:
+        # PUBLIC: auth endpoints - NO Authentication filter
+        - id: auth-public-route
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/auth/**
+
+        # PROTECTED ROUTES - all have Authentication filter
+        - id: user-service-route
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/users/**, /api/audit-logs/**
+          filters:
+            - Authentication
+
+        - id: guest-reservation-service-route
+          uri: lb://GUEST-RESERVATION-SERVICE
+          predicates:
+            - Path=/api/v1/guests/**, /api/v1/reservations/**
+          filters:
+            - Authentication
+
+        - id: room-service-route
+          uri: lb://ROOM-SERVICE
+          predicates:
+            - Path=/api/rooms/**, /api/housekeeping-tasks/**, /api/staff/**, /api/shifts/**
+          filters:
+            - Authentication
+
+        - id: service-order-service-route
+          uri: lb://SERVICE-ORDER-SERVICE
+          predicates:
+            - Path=/api/service-orders/**
+          filters:
+            - Authentication
+
+        - id: finance-service-route
+          uri: lb://FINANCE-SERVICE
+          predicates:
+            - Path=/api/invoices/**, /api/payments/**
+          filters:
+            - Authentication
+
         - id: reporting-service-route
           uri: lb://REPORTING-SERVICE
           predicates:
             - Path=/api/reports/**, /api/kpis/**, /api/audit-packages/**
+          filters:
+            - Authentication
+
+# Shared JWT secret - MUST match all other services
+app:
+  jwt:
+    secret: 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007
 
 eureka:
   client:
     service-url:
       defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true

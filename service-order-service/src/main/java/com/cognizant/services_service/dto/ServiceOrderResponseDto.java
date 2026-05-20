@@ -25,6 +25,7 @@ public class ServiceOrderResponseDto {
     private String description;
     private BigDecimal price;
     private ServiceOrderStatus status;
+    private Long assignedToUserId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

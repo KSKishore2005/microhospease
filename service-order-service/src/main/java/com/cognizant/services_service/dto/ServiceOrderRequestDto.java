@@ -22,16 +22,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ServiceOrderRequestDto {
 
-    @NotNull(message = "guestId is required")
-    @Positive(message = "guestId must be positive")
+    // Optional – walk-in / dine-in orders may not have a reservation or room
     private Long guestId;
-
-    @NotNull(message = "reservationId is required")
-    @Positive(message = "reservationId must be positive")
     private Long reservationId;
-
-    @NotNull(message = "roomId is required")
-    @Positive(message = "roomId must be positive")
     private Long roomId;
 
     @NotNull(message = "serviceType is required")

@@ -36,7 +36,7 @@ public class Guest {
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
-    @Column(nullable = false, length = 15)
+    @Column(length = 20)
     private String phone;
 
     private LocalDate dob;
@@ -64,18 +64,26 @@ public class Guest {
     @Column(length = 100)
     private String country;
 
-    /** Cascade-managed reservations – owned by Reservation side. */
-    @OneToMany(mappedBy = "guest", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    /**
+     * Reservations side owns the FK. We deliberately do NOT cascade DELETE here —
+     * deleting a guest that still has active or historical reservations would
+     * destroy audit trail, finance reconciliation, and room occupancy state.
+     * GuestService.deleteGuest must refuse the delete if any active reservation
+     * exists.
+     */
+    @OneToMany(mappedBy = "guest", cascade = CascadeType.PERSIST, orphanRemoval = false, fetch = FetchType.LAZY)
     @Builder.Default
     private List<com.cognizant.guest_reservation_service.reservation.model.Reservation> reservations = new ArrayList<>();
 
+    // @PrePersist sets these — do NOT use @Builder.Default to avoid the builder
+    // overwriting the entity at INSERT time with a value computed before the
+    // session was attached (root cause of the historic "null id in Guest entry"
+    // Hibernate error when a save was retried after a failed insert).
     @Column(nullable = false, updatable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
     @Column(nullable = false)
-    @Builder.Default
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {

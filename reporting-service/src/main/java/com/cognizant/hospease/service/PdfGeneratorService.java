@@ -30,22 +30,28 @@ public class PdfGeneratorService {
 
     // ─── Scope colour map ────────────────────────────────────────────────────────
 
-    private static final Map<String, Color> SCOPE_COLORS = Map.of(
-            "OCCUPANCY",    new Color(0,   102, 204),
-            "FINANCE",      new Color(0,   128,  0),
-            "STAFF",        new Color(102,   0, 153),
-            "HOUSEKEEPING", new Color(204, 102,   0),
-            "SERVICES",     new Color(153,   0,   0),
-            "GENERAL",      new Color(64,   64,  64)
+    private static final Map<String, Color> SCOPE_COLORS = Map.ofEntries(
+            Map.entry("OCCUPANCY",    new Color(0,   102, 204)),
+            Map.entry("FINANCE",      new Color(0,   128,  0)),
+            Map.entry("FINANCIAL",    new Color(0,   128,  0)),
+            Map.entry("REVENUE",      new Color(0,   160,  64)),
+            Map.entry("OPERATIONAL",  new Color(64,  64,  192)),
+            Map.entry("STAFF",        new Color(102,   0, 153)),
+            Map.entry("HOUSEKEEPING", new Color(204, 102,   0)),
+            Map.entry("SERVICES",     new Color(153,   0,   0)),
+            Map.entry("GENERAL",      new Color(64,   64,  64))
     );
 
-    private static final Map<String, String> SCOPE_LABELS = Map.of(
-            "OCCUPANCY",    "ROOM OCCUPANCY REPORT",
-            "FINANCE",      "FINANCIAL SUMMARY REPORT",
-            "STAFF",        "STAFF ACTIVITY REPORT",
-            "HOUSEKEEPING", "HOUSEKEEPING OPERATIONS REPORT",
-            "SERVICES",     "SERVICE ORDERS REPORT",
-            "GENERAL",      "GENERAL OPERATIONAL REPORT"
+    private static final Map<String, String> SCOPE_LABELS = Map.ofEntries(
+            Map.entry("OCCUPANCY",    "ROOM OCCUPANCY REPORT"),
+            Map.entry("FINANCE",      "FINANCIAL SUMMARY REPORT"),
+            Map.entry("FINANCIAL",    "FINANCIAL SUMMARY REPORT"),
+            Map.entry("REVENUE",      "REVENUE REPORT"),
+            Map.entry("OPERATIONAL",  "OPERATIONAL REPORT"),
+            Map.entry("STAFF",        "STAFF ACTIVITY REPORT"),
+            Map.entry("HOUSEKEEPING", "HOUSEKEEPING OPERATIONS REPORT"),
+            Map.entry("SERVICES",     "SERVICE ORDERS REPORT"),
+            Map.entry("GENERAL",      "GENERAL OPERATIONAL REPORT")
     );
 
     // ─── Public API ──────────────────────────────────────────────────────────────
@@ -166,7 +172,17 @@ public class PdfGeneratorService {
 
     private void ensureDirectory() {
         File dir = new File(folderPath);
-        if (!dir.exists()) dir.mkdirs();
+        if (!dir.exists()) {
+            boolean ok = dir.mkdirs();
+            if (!ok && !dir.exists()) {
+                // mkdirs() returns false even when another thread created the
+                // directory between our checks, so only blow up if it really
+                // doesn't exist after the attempt.
+                throw new RuntimeException(
+                        "Failed to create report storage directory: " + dir.getAbsolutePath()
+                                + " — check that the JVM has write access.");
+            }
+        }
     }
 
     private void addBrandingHeader(Document doc, Color color) throws DocumentException {

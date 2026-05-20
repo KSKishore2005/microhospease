@@ -21,7 +21,10 @@ public class ReservationMapper {
                 .roomId(dto.getRoomId())
                 .checkInDate(dto.getCheckInDate())
                 .checkOutDate(dto.getCheckOutDate())
-                .status(dto.getStatus() != null ? dto.getStatus() : ReservationStatus.CONFIRMED)
+                // New reservations start as PENDING until a staff member (or
+                // the booking workflow) confirms them. CONFIRMED requires explicit
+                // status transition; this default makes the lifecycle work end-to-end.
+                .status(dto.getStatus() != null ? dto.getStatus() : ReservationStatus.PENDING)
                 .specialRequests(dto.getSpecialRequests())
                 .build();
     }

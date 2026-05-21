@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { Download, Search, Shield } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
-import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import { auditLogsApi } from '../../api/users';
 import { auditPackagesApi } from '../../api/reporting';
+import apiClient from '../../api/client';
 import { formatDateTime, formatDate } from '../../utils/formatters';
 
 export default function AuditPackage() {
@@ -14,8 +13,20 @@ export default function AuditPackage() {
   const [resourceFilter, setResourceFilter] = useState('ALL');
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [latestPackageId, setLatestPackageId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+
+  async function handleDownloadPackage(packageId: string) {
+    try {
+      const res = await apiClient.get(`/audit-packages/${packageId}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      alert('Could not download the audit package PDF. Please try again.');
+    }
+  }
 
   const { data: auditLogs = [] } = useQuery({
     queryKey: ['audit-logs'],
@@ -29,10 +40,11 @@ export default function AuditPackage() {
 
   const createPackageMutation = useMutation({
     mutationFn: (payload: Parameters<typeof auditPackagesApi.create>[0]) => auditPackagesApi.create(payload),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['audit-packages'] });
       setGenerating(false);
       setGenerated(true);
+      setLatestPackageId(String(data.packageId));
     },
     onError: () => setGenerating(false),
   });
@@ -82,7 +94,12 @@ export default function AuditPackage() {
               {auditPackages.length > 0 && (
                 <p className="text-xs text-navy-300 mt-0.5">Period: {formatDate(auditPackages[0].periodStart)} – {formatDate(auditPackages[0].periodEnd)}</p>
               )}
-              <Button size="sm" variant="gold" icon={<Download size={14} />} className="mt-1">Download</Button>
+              {latestPackageId && (
+                <Button size="sm" variant="gold" icon={<Download size={14} />} className="mt-1"
+                  onClick={() => handleDownloadPackage(latestPackageId)}>
+                  Download
+                </Button>
+              )}
             </div>
           </div>
         ) : (
@@ -104,7 +121,10 @@ export default function AuditPackage() {
                   <p className="text-xs text-gray-400">Generated: {formatDate(pkg.generatedAt)}</p>
                 </div>
                 {pkg.packageUri && (
-                  <Button size="sm" variant="secondary" icon={<Download size={13} />}>Download</Button>
+                  <Button size="sm" variant="secondary" icon={<Download size={13} />}
+                    onClick={() => handleDownloadPackage(String(pkg.packageId))}>
+                    Download
+                  </Button>
                 )}
               </div>
             ))}

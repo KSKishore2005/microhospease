@@ -7,6 +7,7 @@ import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { auditPackagesApi } from '../../api/reporting';
+import apiClient from '../../api/client';
 import { formatDate } from '../../utils/formatters';
 import { useToastStore } from '../../store/toastStore';
 
@@ -24,11 +25,15 @@ const DEFAULT_CALENDAR_ITEMS: CalendarItem[] = [
   { date: '2026-05-05', task: 'April 2026 Tax Report', status: 'SUBMITTED', priority: 'LOW' },
 ];
 
+// today's date as yyyy-MM-dd for the date input max attribute
+const TODAY = new Date().toISOString().split('T')[0];
+
 export default function ComplianceExports() {
   const addToast = useToastStore((s) => s.addToast);
   const [showNew, setShowNew] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [form, setForm] = useState({ periodStart: '', periodEnd: '', contentsJson: '' });
   const [reminderForm, setReminderForm] = useState<CalendarItem>({ date: '', task: '', status: 'UPCOMING', priority: 'MEDIUM' });
 
@@ -38,6 +43,17 @@ export default function ComplianceExports() {
   });
 
   const queryClient = useQueryClient();
+
+  async function handleDownloadPackage(packageId: string) {
+    try {
+      const res = await apiClient.get(`/audit-packages/${packageId}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data as Blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      addToast('Could not download the audit package PDF. Please try again.', 'error');
+    }
+  }
 
   const { data: auditPackages = [] } = useQuery({
     queryKey: ['audit-packages'],
@@ -50,17 +66,32 @@ export default function ComplianceExports() {
       queryClient.invalidateQueries({ queryKey: ['audit-packages'] });
       setShowNew(false);
       setGenerating(false);
+      setFormError(null);
       setForm({ periodStart: '', periodEnd: '', contentsJson: '' });
       addToast('Audit compliance package generated!', 'success');
     },
-    onError: () => {
+    onError: (err: unknown) => {
       setGenerating(false);
-      addToast('Failed to generate audit package.', 'error');
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'Failed to generate audit package. Please try again.';
+      setFormError(msg);
     },
   });
 
   const handleGenerate = () => {
-    if (!form.periodStart || !form.periodEnd) return;
+    setFormError(null);
+    if (!form.periodStart || !form.periodEnd) {
+      setFormError('Please select both a start and end date.');
+      return;
+    }
+    if (form.periodEnd > TODAY) {
+      setFormError(`Period end date cannot be in the future. Please select a date on or before ${TODAY}.`);
+      return;
+    }
+    if (form.periodEnd <= form.periodStart) {
+      setFormError('Period end date must be after the start date.');
+      return;
+    }
     setGenerating(true);
     createMutation.mutate({
       periodStart: form.periodStart,
@@ -137,8 +168,8 @@ export default function ComplianceExports() {
             </div>
             <div className="flex gap-2">
               {pkg.packageUri ? (
-                <Button size="sm" icon={<Download size={13} />}>
-                  <a href={pkg.packageUri} target="_blank" rel="noopener noreferrer">Download Package</a>
+                <Button size="sm" icon={<Download size={13} />} onClick={() => handleDownloadPackage(pkg.packageId)}>
+                  Download Package
                 </Button>
               ) : (
                 <span className="text-xs text-gray-400 self-center">No download available</span>
@@ -184,24 +215,35 @@ export default function ComplianceExports() {
       </Card>
 
       {/* New compliance export modal */}
-      <Modal open={showNew} onClose={() => setShowNew(false)} title="New Compliance Export" size="md"
+      <Modal open={showNew} onClose={() => { setShowNew(false); setFormError(null); }} title="New Compliance Export" size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setShowNew(false)}>Cancel</Button>
-            <Button onClick={handleGenerate} disabled={!form.periodStart || !form.periodEnd || generating}>
+            <Button variant="secondary" onClick={() => { setShowNew(false); setFormError(null); }}>Cancel</Button>
+            <Button onClick={handleGenerate} loading={generating} disabled={!form.periodStart || !form.periodEnd || generating}>
               {generating ? 'Generating...' : 'Generate Export'}
             </Button>
           </>
         }>
         <div className="space-y-4">
+          {formError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 flex items-start gap-2">
+              <FileBadge size={16} className="flex-shrink-0 mt-0.5 text-rose-500" />
+              <span>{formError}</span>
+            </div>
+          )}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+            ⚠️ Both dates must be in the past. The backend cannot package future data.
+          </div>
           <div>
             <label className="input-label">Period Start</label>
-            <input type="date" value={form.periodStart} onChange={(e) => setForm((f) => ({ ...f, periodStart: e.target.value }))}
+            <input type="date" value={form.periodStart} max={TODAY}
+              onChange={(e) => setForm((f) => ({ ...f, periodStart: e.target.value }))}
               className="input" />
           </div>
           <div>
-            <label className="input-label">Period End</label>
-            <input type="date" value={form.periodEnd} onChange={(e) => setForm((f) => ({ ...f, periodEnd: e.target.value }))}
+            <label className="input-label">Period End <span className="text-gray-400 font-normal">(must be today or earlier)</span></label>
+            <input type="date" value={form.periodEnd} max={TODAY}
+              onChange={(e) => setForm((f) => ({ ...f, periodEnd: e.target.value }))}
               className="input" />
           </div>
           <div>

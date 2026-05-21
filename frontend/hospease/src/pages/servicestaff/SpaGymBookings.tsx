@@ -11,6 +11,7 @@ import type { ServiceOrderResponseDto, ServiceType, ServiceOrderStatus } from '.
 import { reservationsApi } from '../../api/reservations';
 import { formatDate, formatCurrency, formatRelative } from '../../utils/formatters';
 import { useToastStore } from '../../store/toastStore';
+import { useAuthStore } from '../../store/authStore';
 
 interface GymClass {
   id: string;
@@ -34,6 +35,8 @@ const DEFAULT_GYM_CLASSES: GymClass[] = [
 ];
 
 export default function SpaGymBookings() {
+  const { user } = useAuthStore();
+  const isServiceStaff = user?.role === 'SERVICE_STAFF';
   const [selected, setSelected] = useState<ServiceOrderResponseDto | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [enrollClass, setEnrollClass] = useState<string | null>(null);
@@ -143,10 +146,10 @@ export default function SpaGymBookings() {
         <Button onClick={() => setShowNew(true)} icon={<Plus size={16} />}>New Booking</Button>
       </div>
 
-      {/* Stats */}
+      {/* Stats — hide Spa Revenue for service staff */}
       <div className="grid sm:grid-cols-3 gap-4 stagger">
         {[
-          { label: 'Spa Revenue', value: formatCurrency(spaRevenue), sub: 'from completed services', bg: 'from-purple-500 to-violet-600' },
+          ...(!isServiceStaff ? [{ label: 'Spa Revenue', value: formatCurrency(spaRevenue), sub: 'from completed services', bg: 'from-purple-500 to-violet-600' }] : []),
           { label: 'Active Bookings', value: String(confirmedBookings), sub: 'pending & confirmed', bg: 'from-blue-500 to-blue-700' },
           { label: 'Total Bookings', value: String(bookings.length), sub: 'all time', bg: 'from-emerald-500 to-teal-600' },
         ].map((s) => (
@@ -174,7 +177,7 @@ export default function SpaGymBookings() {
                     <p className="text-xs text-gray-400 mt-0.5">{formatRelative(b.createdAt)}</p>
                   </div>
                   <div className="text-right">
-                    {b.price > 0 && <p className="font-bold text-gray-800">{formatCurrency(b.price)}</p>}
+                    {b.price > 0 && !isServiceStaff && <p className="font-bold text-gray-800">{formatCurrency(b.price)}</p>}
                     <Badge variant={statusBadge(b.status)} className="mt-1">{b.status.replace('_', ' ')}</Badge>
                   </div>
                 </div>

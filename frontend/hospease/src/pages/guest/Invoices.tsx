@@ -12,12 +12,9 @@ import { useEffectiveGuestId } from '../../hooks/useEffectiveGuestId';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
-  { value: 'CREDIT_CARD',   label: 'Credit Card',   icon: '💳' },
-  { value: 'DEBIT_CARD',    label: 'Debit Card',    icon: '💳' },
-  { value: 'UPI',           label: 'UPI',           icon: '📱' },
-  { value: 'WALLET',        label: 'Wallet',        icon: '👛' },
-  { value: 'BANK_TRANSFER', label: 'Bank Transfer', icon: '🏦' },
-  { value: 'CASH',          label: 'Cash',          icon: '💵' },
+  { value: 'CREDIT_CARD', label: 'Credit Card', icon: '💳' },
+  { value: 'DEBIT_CARD',  label: 'Debit Card',  icon: '💳' },
+  { value: 'CASH',        label: 'Cash',        icon: '💵' },
 ];
 
 export default function Invoices() {
@@ -194,20 +191,26 @@ export default function Invoices() {
               </div>
             )}
 
-            {/* Totals */}
+            {/* Totals — backward 12% tax */}
             <div className="space-y-1.5 text-sm border-t border-gray-100 pt-4">
-              <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(viewInvoice.totalAmount)}</span></div>
-              <div className="flex justify-between text-emerald-700"><span>Paid</span><span>−{formatCurrency(viewInvoice.amountPaid)}</span></div>
-              {viewInvoice.balanceDue > 0 && (
-                <div className="flex justify-between text-rose-600 font-bold border-t border-gray-100 pt-1.5">
-                  <span>Balance Due</span><span>{formatCurrency(viewInvoice.balanceDue)}</span>
-                </div>
-              )}
-              {viewInvoice.balanceDue === 0 && (
-                <div className="flex justify-between text-emerald-600 font-bold border-t border-gray-100 pt-1.5">
-                  <span>Fully Paid</span><span>✓</span>
-                </div>
-              )}
+              {(() => {
+                const subtotal = viewInvoice.totalAmount / 1.12;
+                const tax = viewInvoice.totalAmount - subtotal;
+                return (
+                  <>
+                    <div className="flex justify-between text-gray-600"><span>Subtotal (excl. tax)</span><span>{formatCurrency(subtotal)}</span></div>
+                    <div className="flex justify-between text-gray-500"><span>Tax (12%)</span><span>{formatCurrency(tax)}</span></div>
+                    <div className="flex justify-between font-bold text-gray-900 border-t border-gray-100 pt-1.5"><span>Total</span><span>{formatCurrency(viewInvoice.totalAmount)}</span></div>
+                    <div className="flex justify-between text-emerald-700"><span>Paid</span><span>−{formatCurrency(viewInvoice.amountPaid)}</span></div>
+                    {viewInvoice.balanceDue > 0 && (
+                      <div className="flex justify-between text-rose-600 font-bold border-t border-gray-100 pt-1.5"><span>Balance Due</span><span>{formatCurrency(viewInvoice.balanceDue)}</span></div>
+                    )}
+                    {viewInvoice.balanceDue === 0 && (
+                      <div className="flex justify-between text-emerald-600 font-bold border-t border-gray-100 pt-1.5"><span>Fully Paid</span><span>✓</span></div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
         </Modal>

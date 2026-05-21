@@ -8,6 +8,7 @@ import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import { formatRelative } from '../../utils/formatters';
+import { useMemo } from 'react';
 
 export default function HousekeepingDashboard() {
   const { data: tasks = [] }  = useQuery({ queryKey: ['housekeeping'],              queryFn: housekeepingApi.getAll });
@@ -16,6 +17,11 @@ export default function HousekeepingDashboard() {
     queryKey: ['service-orders', 'MAINTENANCE'],
     queryFn: () => serviceOrdersApi.getByType('MAINTENANCE'),
   });
+
+  const roomMap = useMemo(
+    () => Object.fromEntries(rooms.map((r) => [r.roomId, r.number])),
+    [rooms]
+  );
 
   const pending    = tasks.filter((t) => t.status === 'PENDING').length;
   const inProgress = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
@@ -120,7 +126,7 @@ export default function HousekeepingDashboard() {
                   t.status === 'IN_PROGRESS' ? 'bg-amber-400' : 'bg-gray-300'
                 }`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">Room {t.roomId}</p>
+                  <p className="text-sm font-semibold text-gray-900">Room {roomMap[t.roomId] ?? t.roomId}</p>
                   <p className="text-xs text-gray-400">
                     Assigned: {t.assignedToUserId ?? 'Unassigned'}
                     {t.scheduledAt && ` · ${formatRelative(t.scheduledAt)}`}

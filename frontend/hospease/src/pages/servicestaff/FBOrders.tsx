@@ -10,6 +10,7 @@ import { serviceOrdersApi } from '../../api/serviceOrders';
 import type { ServiceOrderResponseDto, ServiceType, ServiceOrderStatus } from '../../api/serviceOrders';
 import { reservationsApi } from '../../api/reservations';
 import { formatCurrency, formatRelative } from '../../utils/formatters';
+import { useAuthStore } from '../../store/authStore';
 
 type OrderStatus = 'PENDING' | 'IN_PROGRESS' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 
@@ -34,6 +35,8 @@ const ORDER_TYPES: { type: ServiceType; label: string }[] = [
 ];
 
 export default function FBOrders() {
+  const { user } = useAuthStore();
+  const isServiceStaff = user?.role === 'SERVICE_STAFF';
   const [selected, setSelected] = useState<ServiceOrderResponseDto | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({
@@ -161,7 +164,7 @@ export default function FBOrders() {
                     <p className="text-xs text-gray-600 font-medium">{order.roomId ? `Room ${order.roomId}` : 'Dine-in'}</p>
                     <p className="text-xs text-gray-400">{order.description?.slice(0, 30) ?? 'No description'}</p>
                     <p className="text-xs text-gray-400 mt-1">{formatRelative(order.createdAt)}</p>
-                    {order.price > 0 && <p className="text-xs font-semibold text-gray-600 mt-1">{formatCurrency(order.price)}</p>}
+                    {order.price > 0 && !isServiceStaff && <p className="text-xs font-semibold text-gray-600 mt-1">{formatCurrency(order.price)}</p>}
                     {STATUS_FLOW[status] && (
                       <button onClick={(e) => { e.stopPropagation(); advance(order.orderId, order.status); }}
                         className="mt-2 w-full py-1 text-xs font-medium bg-navy-900 text-white rounded-md hover:bg-navy-800 transition-colors">
@@ -185,7 +188,7 @@ export default function FBOrders() {
               <div><p className="text-gray-500">Type</p><p className="font-medium">{selected.serviceType.replace('_', ' ')}</p></div>
               <div><p className="text-gray-500">Location</p><p className="font-medium">{selected.roomId ? `Room ${selected.roomId}` : 'Dine-in'}</p></div>
               <div><p className="text-gray-500">Status</p><Badge variant={statusBadge(selected.status)}>{selected.status.replace('_', ' ')}</Badge></div>
-              {selected.price > 0 && <div><p className="text-gray-500">Price</p><p className="font-medium">{formatCurrency(selected.price)}</p></div>}
+              {selected.price > 0 && !isServiceStaff && <div><p className="text-gray-500">Price</p><p className="font-medium">{formatCurrency(selected.price)}</p></div>}
             </div>
             {selected.description && (
               <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-700">

@@ -1,11 +1,11 @@
-import { ShoppingCart, Clock, CheckCircle2, Leaf, ArrowRight, DollarSign, TrendingUp } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle2, Leaf, ArrowRight, WashingMachine } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
 import { serviceOrdersApi } from '../../api/serviceOrders';
-import { formatRelative, formatCurrency } from '../../utils/formatters';
+import { formatRelative } from '../../utils/formatters';
 
 export default function ServiceStaffDashboard() {
   const { data: restaurantOrders = [] } = useQuery({
@@ -23,9 +23,6 @@ export default function ServiceStaffDashboard() {
   const completed   = orders.filter((o) => o.status === 'COMPLETED').length;
   const confirmedSpa= spaOrders.filter((s) => s.status === 'CONFIRMED' || s.status === 'PENDING').length;
 
-  const fbRevenue   = orders.filter((o) => o.status === 'COMPLETED').reduce((s, o) => s + (o.price ?? 0), 0);
-  const spaRevenue  = spaOrders.filter((b) => b.status === 'COMPLETED').reduce((s, b) => s + (b.price ?? 0), 0);
-
   const liveOrders  = orders.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
   const liveSpa     = spaOrders.filter((b) => b.status === 'CONFIRMED' || b.status === 'PENDING');
 
@@ -37,13 +34,9 @@ export default function ServiceStaffDashboard() {
           <p className="text-sm text-gray-400 mt-0.5">F&B orders, spa bookings, and service fulfillment</p>
         </div>
         <div className="flex gap-2">
-          <Link to="/servicestaff/orders"
+          <Link to="/servicestaff/fulfillment"
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-navy-900 text-white text-sm font-semibold rounded-xl hover:bg-navy-800 transition-colors shadow-sm">
-            <ShoppingCart size={15} /> F&B Orders
-          </Link>
-          <Link to="/servicestaff/spa-gym"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-navy-900 border border-gray-200 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
-            <Leaf size={15} /> Spa & Gym
+            <CheckCircle2 size={15} /> My Tasks
           </Link>
         </div>
       </div>
@@ -56,23 +49,25 @@ export default function ServiceStaffDashboard() {
         <StatCard title="Spa Bookings"    value={confirmedSpa} icon={<Leaf size={20} />}         color="purple"  className="animate-fade-in-up" />
       </div>
 
-      {/* Revenue summary */}
+      {/* Quick Links — replaces revenue summary */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'F&B Revenue',     value: fbRevenue,              icon: '🍽️', bg: 'from-orange-500 to-amber-500' },
-          { label: 'Spa Revenue',     value: spaRevenue,             icon: '💆', bg: 'from-purple-500 to-violet-500' },
-          { label: 'Total Service',   value: fbRevenue + spaRevenue, icon: '💰', bg: 'from-emerald-500 to-teal-500' },
+          { to: '/servicestaff/fulfillment', icon: '🎯', label: 'My Assignments',  desc: 'View tasks assigned to you',       bg: 'from-navy-600 to-navy-800'       },
+          { to: '/servicestaff/orders',      icon: '🍽️', label: 'F&B Orders',      desc: 'Food & beverage order management', bg: 'from-orange-500 to-amber-500'    },
+          { to: '/servicestaff/spa-gym',     icon: '💆', label: 'Spa & Gym',       desc: 'Appointment scheduling',           bg: 'from-purple-500 to-violet-500'   },
         ].map((item) => (
-          <div key={item.label} className={`relative overflow-hidden p-4 rounded-2xl bg-gradient-to-br ${item.bg} text-white`}>
+          <Link key={item.to} to={item.to}
+            className={`relative overflow-hidden p-4 rounded-2xl bg-gradient-to-br ${item.bg} text-white hover:opacity-90 transition-opacity`}>
             <div className="absolute -top-4 -right-4 text-5xl opacity-20">{item.icon}</div>
-            <p className="text-white/70 text-xs font-semibold uppercase tracking-wider">{item.label}</p>
-            <p className="text-2xl font-bold mt-1">{formatCurrency(item.value)}</p>
-          </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{item.label}</p>
+            <p className="text-sm font-bold mt-1">{item.desc}</p>
+            <ArrowRight size={14} className="mt-2 text-white/60" />
+          </Link>
         ))}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Live F&B orders */}
+        {/* Live F&B orders — prices hidden */}
         <Card title="Live F&B Orders" icon={<ShoppingCart size={16} />}
           action={<Link to="/servicestaff/orders" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">POS View <ArrowRight size={11} /></Link>}>
           <div className="space-y-2">
@@ -87,10 +82,8 @@ export default function ServiceStaffDashboard() {
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant={statusBadge(order.status)} dot>{order.status.replace('_', ' ')}</Badge>
-                  {(order.price ?? 0) > 0 && <span className="text-xs font-bold text-gray-700">{formatCurrency(order.price)}</span>}
-                </div>
+                {/* Prices intentionally hidden for service staff */}
+                <Badge variant={statusBadge(order.status)} dot>{order.status.replace('_', ' ')}</Badge>
               </div>
             ))}
             {liveOrders.length === 0 && (
@@ -102,7 +95,7 @@ export default function ServiceStaffDashboard() {
           </div>
         </Card>
 
-        {/* Spa bookings */}
+        {/* Spa bookings — prices hidden */}
         <Card title="Spa & Gym Bookings" icon={<Leaf size={16} />}
           action={<Link to="/servicestaff/spa-gym" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">Manage <ArrowRight size={11} /></Link>}>
           <div className="space-y-2">
@@ -117,10 +110,8 @@ export default function ServiceStaffDashboard() {
                     <p className="text-xs text-gray-400">{formatRelative(booking.createdAt)}</p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant={statusBadge(booking.status)} dot>{booking.status.replace('_', ' ')}</Badge>
-                  {(booking.price ?? 0) > 0 && <span className="text-xs font-bold text-gray-700">{formatCurrency(booking.price)}</span>}
-                </div>
+                {/* Prices intentionally hidden for service staff */}
+                <Badge variant={statusBadge(booking.status)} dot>{booking.status.replace('_', ' ')}</Badge>
               </div>
             ))}
             {liveSpa.length === 0 && (

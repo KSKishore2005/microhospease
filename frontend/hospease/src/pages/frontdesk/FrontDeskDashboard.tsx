@@ -1,4 +1,4 @@
-import { Key, MessageSquare, Calendar, Users, BedDouble, ArrowRight, Clock, CheckCircle2, LogIn, LogOut } from 'lucide-react';
+import { Key, Calendar, Users, BedDouble, ArrowRight, LogIn, LogOut, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
@@ -6,20 +6,17 @@ import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
 import { reservationsApi } from '../../api/reservations';
 import { roomsApi } from '../../api/rooms';
-import { serviceOrdersApi } from '../../api/serviceOrders';
 import { formatDate, formatRelative } from '../../utils/formatters';
 
 export default function FrontDeskDashboard() {
   const today = new Date().toISOString().split('T')[0];
-
   const { data: reservations = [] } = useQuery({ queryKey: ['reservations'], queryFn: reservationsApi.getAll });
   const { data: rooms = [] }        = useQuery({ queryKey: ['rooms'],        queryFn: roomsApi.getAll });
-  const { data: serviceOrders = [] }= useQuery({ queryKey: ['service-orders'], queryFn: serviceOrdersApi.getAll });
 
-  const checkIns    = reservations.filter((r) => r.checkInDate  === today && (r.status === 'CONFIRMED' || r.status === 'CHECKED_IN'));
-  const checkOuts   = reservations.filter((r) => r.checkOutDate === today && r.status === 'CHECKED_IN');
-  const inHouse     = reservations.filter((r) => r.status === 'CHECKED_IN');
-  const pendingOrders = serviceOrders.filter((o) => o.status === 'PENDING').length;
+  const checkIns   = reservations.filter((r) => r.checkInDate  === today && (r.status === 'CONFIRMED' || r.status === 'CHECKED_IN'));
+  const checkOuts  = reservations.filter((r) => r.checkOutDate === today && r.status === 'CHECKED_IN');
+  const inHouse    = reservations.filter((r) => r.status === 'CHECKED_IN');
+  const approved   = reservations.filter((r) => r.status === 'CONFIRMED');
 
   const available   = rooms.filter((r) => r.status === 'AVAILABLE').length;
   const occupied    = rooms.filter((r) => r.status === 'OCCUPIED').length;
@@ -28,10 +25,10 @@ export default function FrontDeskDashboard() {
   const occupancy   = rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0;
 
   const roomStatusItems = [
-    { label: 'Available',   count: available,   color: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-    { label: 'Occupied',    count: occupied,    color: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700' },
-    { label: 'Cleaning',    count: cleaning,    color: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700' },
-    { label: 'Maintenance', count: maintenance, color: 'bg-rose-500',    bg: 'bg-rose-50',    text: 'text-rose-700' },
+    { label: 'Available',   count: available,   color: 'bg-emerald-500' },
+    { label: 'Occupied',    count: occupied,    color: 'bg-blue-500'    },
+    { label: 'Cleaning',    count: cleaning,    color: 'bg-amber-500'   },
+    { label: 'Maintenance', count: maintenance, color: 'bg-rose-500'    },
   ];
 
   return (
@@ -44,17 +41,16 @@ export default function FrontDeskDashboard() {
         </div>
         <Link to="/frontdesk/checkinout"
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-navy-900 text-white text-sm font-semibold rounded-xl hover:bg-navy-800 transition-colors shadow-sm">
-          <Key size={15} />
-          Check In / Out
+          <Key size={15} /> Check In / Out
         </Link>
       </div>
 
-      {/* Stats */}
+      {/* Stats — no financial data for Front Desk */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
-        <StatCard title="Today's Arrivals"   value={checkIns.length}  subtitle="expected check-ins"  icon={<LogIn size={20} />}         color="emerald" trend={{ value: 12, label: 'vs yesterday' }} className="animate-fade-in-up" />
-        <StatCard title="Today's Departures" value={checkOuts.length} subtitle="departures due"       icon={<LogOut size={20} />}        color="rose"    className="animate-fade-in-up" />
-        <StatCard title="In-House Guests"    value={inHouse.length}   subtitle={`${occupancy}% occupancy`} icon={<Users size={20} />} color="navy"    className="animate-fade-in-up" />
-        <StatCard title="Pending Requests"   value={pendingOrders}    subtitle="require attention"    icon={<MessageSquare size={20} />} color="amber"   className="animate-fade-in-up" />
+        <StatCard title="Today's Arrivals"   value={checkIns.length}  subtitle="expected check-ins"    icon={<LogIn size={20} />}      color="emerald" className="animate-fade-in-up" />
+        <StatCard title="Today's Departures" value={checkOuts.length} subtitle="departures due"         icon={<LogOut size={20} />}     color="rose"    className="animate-fade-in-up" />
+        <StatCard title="In-House Guests"    value={inHouse.length}   subtitle={`${occupancy}% occupancy`} icon={<Users size={20} />}  color="navy"    className="animate-fade-in-up" />
+        <StatCard title="Approved Bookings"  value={approved.length}  subtitle="confirmed reservations"  icon={<Calendar size={20} />}  color="amber"   className="animate-fade-in-up" />
       </div>
 
       {/* Occupancy bar */}
@@ -64,10 +60,7 @@ export default function FrontDeskDashboard() {
           <span className="text-2xl font-bold text-navy-900">{occupancy}%</span>
         </div>
         <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-navy-700 to-navy-500 rounded-full transition-all duration-700"
-            style={{ width: `${occupancy}%` }}
-          />
+          <div className="h-full bg-gradient-to-r from-navy-700 to-navy-500 rounded-full transition-all duration-700" style={{ width: `${occupancy}%` }} />
         </div>
         <div className="flex gap-4 mt-4">
           {roomStatusItems.map((item) => (
@@ -134,26 +127,28 @@ export default function FrontDeskDashboard() {
           </div>
         </Card>
 
-        {/* Recent service orders */}
-        <Card title="Service Requests" icon={<MessageSquare size={16} />}
-          action={<Link to="/frontdesk/communications" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">View all <ArrowRight size={11} /></Link>}>
+        {/* Approved Reservations (replaces Pending Service Requests card) */}
+        <Card title="Approved Reservations" icon={<Calendar size={16} />}
+          action={<Link to="/frontdesk/reservations" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">View all <ArrowRight size={11} /></Link>}>
           <div className="space-y-3">
-            {serviceOrders.slice(0, 5).map((order) => (
-              <div key={order.orderId} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
-                <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${order.status === 'PENDING' ? 'bg-rose-500' : 'bg-gray-300'}`} />
+            {approved.slice(0, 5).map((r) => (
+              <div key={r.reservationId} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                <div className="w-8 h-8 rounded-lg bg-navy-50 flex items-center justify-center flex-shrink-0">
+                  <BedDouble size={14} className="text-navy-700" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{order.serviceType.replace(/_/g, ' ')}</p>
-                    <Badge variant={statusBadge(order.status)}>{order.status.replace('_', ' ')}</Badge>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{r.guestName}</p>
+                    <Badge variant={statusBadge(r.status)}>{r.status.replace('_', ' ')}</Badge>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">{order.description ?? 'No description'} · {formatRelative(order.createdAt)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Room {r.roomNumber} · Check-in {formatRelative(r.checkInDate)}</p>
                 </div>
               </div>
             ))}
-            {serviceOrders.length === 0 && (
+            {approved.length === 0 && (
               <div className="text-center py-8">
-                <MessageSquare size={28} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">No service requests</p>
+                <Calendar size={28} className="text-gray-200 mx-auto mb-2" />
+                <p className="text-sm text-gray-400">No approved reservations</p>
               </div>
             )}
           </div>

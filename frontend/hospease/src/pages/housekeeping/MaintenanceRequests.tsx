@@ -8,7 +8,9 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import type { ServiceOrderResponseDto, ServiceOrderStatus } from '../../api/serviceOrders';
+import { roomsApi } from '../../api/rooms';
 import { formatRelative, formatDate } from '../../utils/formatters';
+import { useMemo } from 'react';
 
 const priorityConfig: Record<string, { icon: string; label: string; badge: string }> = {
   IN_PROGRESS: { icon: '⚠️', label: 'In Progress', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -27,6 +29,9 @@ export default function MaintenanceRequests() {
     queryKey: ['service-orders', 'MAINTENANCE'],
     queryFn: () => serviceOrdersApi.getByType('MAINTENANCE'),
   });
+
+  const { data: rooms = [] } = useQuery({ queryKey: ['rooms'], queryFn: roomsApi.getAll });
+  const roomMap = useMemo(() => Object.fromEntries(rooms.map((r) => [r.roomId, r.number])), [rooms]);
 
   const createMutation = useMutation({
     mutationFn: (payload: Parameters<typeof serviceOrdersApi.create>[0]) => serviceOrdersApi.create(payload),
@@ -106,7 +111,7 @@ export default function MaintenanceRequests() {
                   </div>
                   <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-400">
                     <span>{formatRelative(req.createdAt)}</span>
-                    {req.roomId && <span className="flex items-center gap-1">📍 Room {req.roomId}</span>}
+                    {req.roomId && <span className="flex items-center gap-1">📍 Room {roomMap[req.roomId] ?? req.roomId}</span>}
                   </div>
                 </div>
                 <ChevronRight size={16} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0 mt-1" />
@@ -209,7 +214,7 @@ export default function MaintenanceRequests() {
               {[
                 ['Status', <Badge key="s" variant={statusBadge(selected.status)} dot>{selected.status.replace('_', ' ')}</Badge>],
                 ['Order ID', String(selected.orderId).slice(0, 12) + '...'],
-                ['Room / Location', selected.roomId || 'Not specified'],
+                ['Room / Location', selected.roomId ? `Room ${roomMap[selected.roomId] ?? selected.roomId}` : 'Not specified'],
                 ['Reported', formatDate(selected.createdAt)],
               ].map(([l, v], i) => (
                 <div key={i} className="p-3 bg-gray-50 rounded-xl">

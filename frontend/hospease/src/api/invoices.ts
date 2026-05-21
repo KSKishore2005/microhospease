@@ -36,7 +36,36 @@ export interface LineItem {
 }
 
 export function parseLineItems(json: string): LineItem[] {
-  try { return JSON.parse(json) ?? []; } catch { return []; }
+  try {
+    const parsed = JSON.parse(json);
+    // Flat array (standard format)
+    if (Array.isArray(parsed)) return parsed as LineItem[];
+    // Hybrid object: { roomCharge: {...}, serviceOrders: [...] }
+    if (parsed && typeof parsed === 'object') {
+      const items: LineItem[] = [];
+      if (parsed.roomCharge) {
+        const rc = parsed.roomCharge;
+        items.push({
+          description: rc.description ?? 'Room Charge',
+          quantity: rc.quantity ?? 1,
+          unitPrice: rc.unitPrice ?? rc.ratePerNight ?? 0,
+          total: rc.total ?? rc.amount ?? 0,
+        });
+      }
+      if (Array.isArray(parsed.serviceOrders)) {
+        parsed.serviceOrders.forEach((so: Record<string, unknown>) => {
+          items.push({
+            description: String(so.description ?? so.serviceType ?? 'Service'),
+            quantity: Number(so.quantity ?? 1),
+            unitPrice: Number(so.unitPrice ?? so.price ?? 0),
+            total: Number(so.total ?? so.price ?? 0),
+          });
+        });
+      }
+      return items;
+    }
+    return [];
+  } catch { return []; }
 }
 
 export const invoicesApi = {

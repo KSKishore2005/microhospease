@@ -1,7 +1,8 @@
-import { Users, TrendingUp, Hotel, Clock, Star, ArrowRight, BarChart3, Target } from 'lucide-react';
+import { Users, TrendingUp, Hotel, Clock, ArrowRight, BarChart3, Target, CheckCircle2, UserCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
@@ -9,42 +10,68 @@ import { reservationsApi } from '../../api/reservations';
 import { roomsApi } from '../../api/rooms';
 import { staffApi } from '../../api/staff';
 import { serviceOrdersApi } from '../../api/serviceOrders';
+import { usersApi } from '../../api/users';
 import { kpisApi } from '../../api/reporting';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
-
-const statusColors: Record<string, string> = {
-  AVAILABLE:   'bg-emerald-500',
-  OCCUPIED:    'bg-blue-500',
-  CLEANING:    'bg-amber-500',
-  MAINTENANCE: 'bg-rose-500',
-};
+import { useWorkflowStore } from '../../store/workflowStore';
+import { useToastStore } from '../../store/toastStore';
 
 export default function ManagerDashboard() {
-  const { data: reservations = [] } = useQuery({ queryKey: ['reservations'],   queryFn: reservationsApi.getAll });
-  const { data: rooms = [] }        = useQuery({ queryKey: ['rooms'],           queryFn: roomsApi.getAll });
-  const { data: staff = [] }        = useQuery({ queryKey: ['staff'],           queryFn: staffApi.getAll });
+  const { data: reservations = [] } = useQuery({ queryKey: ['reservations'],    queryFn: reservationsApi.getAll });
+  const { data: rooms = [] }        = useQuery({ queryKey: ['rooms'],            queryFn: roomsApi.getAll });
+  const { data: staff = [] }        = useQuery({ queryKey: ['staff'],            queryFn: staffApi.getAll });
   const { data: serviceOrders = [] }= useQuery({ queryKey: ['service-orders'],  queryFn: serviceOrdersApi.getAll });
   const { data: kpis = [] }         = useQuery({ queryKey: ['kpis'],            queryFn: kpisApi.getAll });
+  const { data: allUsers = [] }     = useQuery({ queryKey: ['users'],           queryFn: usersApi.getAll });
 
-  const activeStaff    = staff.filter((s) => s.status === 'ACTIVE').length;
-  const checkedIn      = reservations.filter((r) => r.status === 'CHECKED_IN').length;
-  const totalRooms     = rooms.length;
-  const occupancyRate  = totalRooms > 0 ? Math.round((checkedIn / totalRooms) * 100) : 0;
-  const pendingOrders  = serviceOrders.filter((o) => o.status === 'PENDING').length;
-  const revenueKPI     = kpis.find((k) => k.name.toLowerCase().includes('revenue'));
+  const queryClient = useQueryClient();
+  const { customStatuses, setStatus } = useWorkflowStore();
+  const addToast = useToastStore((s) => s.addToast);
+
+  const [assignMap, setAssignMap] = useState<Record<string, string>>({});
+
+  const serviceStaff = allUsers.filter((u) => u.role === 'RESTAURANT_SERVICE_STAFF' && u.status === 'ACTIVE');
+
+  const assignMutation = useMutation({
+    mutationFn: ({ orderId, userId }: { orderId: string; userId: string }) =>
+      serviceOrdersApi.assign(orderId, userId),
+    onSuccess: (_, { orderId, userId }) => {
+      const staffMember = allUsers.find((u) => u.userId === userId);
+      setStatus(orderId, 'STAFF_ASSIGNED', { assignedUserId: userId, assignedUserName: staffMember?.name });
+      queryClient.invalidateQueries({ queryKey: ['service-orders'] });
+      addToast(`Task assigned to ${staffMember?.name ?? 'staff'}`, 'success');
+    },
+  });
+
+  const handleVerify = (orderId: string) => {
+    setStatus(orderId, 'MANAGER_VERIFIED');
+    addToast('Task verified — Front Desk can now close it', 'success');
+  };
+
+  const activeStaff   = staff.filter((s) => s.status === 'ACTIVE').length;
+  const checkedIn     = reservations.filter((r) => r.status === 'CHECKED_IN').length;
+  const totalRooms    = rooms.length;
+  const occupancyRate = totalRooms > 0 ? Math.round((checkedIn / totalRooms) * 100) : 0;
+  const revenueKPI    = kpis.find((k) => k.name.toLowerCase().includes('revenue'));
 
   const chartData = kpis.slice(0, 12).map((k, i) => ({
-    name: `D${i + 1}`,
-    current: Number(k.currentValue) || 0,
-    target:  Number(k.target) || 0,
+    name: `D${i + 1}`, current: Number(k.currentValue) || 0, target: Number(k.target) || 0,
   }));
 
   const roomGroups = [
-    { label: 'Available',   count: rooms.filter((r) => r.status === 'AVAILABLE').length,   color: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50' },
-    { label: 'Occupied',    count: rooms.filter((r) => r.status === 'OCCUPIED').length,    color: 'bg-blue-500',    text: 'text-blue-700',    bg: 'bg-blue-50' },
-    { label: 'Cleaning',    count: rooms.filter((r) => r.status === 'CLEANING').length,    color: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50' },
-    { label: 'Maintenance', count: rooms.filter((r) => r.status === 'MAINTENANCE').length, color: 'bg-rose-500',    text: 'text-rose-700',    bg: 'bg-rose-50' },
+    { label: 'Available',   count: rooms.filter((r) => r.status === 'AVAILABLE').length,   color: 'bg-emerald-500' },
+    { label: 'Occupied',    count: rooms.filter((r) => r.status === 'OCCUPIED').length,    color: 'bg-blue-500'    },
+    { label: 'Cleaning',    count: rooms.filter((r) => r.status === 'CLEANING').length,    color: 'bg-amber-500'   },
+    { label: 'Maintenance', count: rooms.filter((r) => r.status === 'MAINTENANCE').length, color: 'bg-rose-500'    },
   ];
+
+  // Orders in the workflow that need manager attention
+  const forwardedOrders = serviceOrders.filter((o) =>
+    customStatuses[o.orderId]?.status === 'FORWARDED_TO_MANAGER'
+  );
+  const completedByStaff = serviceOrders.filter((o) =>
+    customStatuses[o.orderId]?.status === 'STAFF_COMPLETED'
+  );
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -61,11 +88,77 @@ export default function ManagerDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
-        <StatCard title="Occupancy Rate"   value={`${occupancyRate}%`}                            icon={<Hotel size={20} />}       color="navy"    className="animate-fade-in-up" />
-        <StatCard title="Revenue KPI"      value={revenueKPI ? formatCurrency(revenueKPI.currentValue) : '—'} icon={<TrendingUp size={20} />}  color="emerald" className="animate-fade-in-up" />
-        <StatCard title="Active Staff"     value={activeStaff}    subtitle={`of ${staff.length} total`} icon={<Users size={20} />}       color="blue"    className="animate-fade-in-up" />
-        <StatCard title="Pending Requests" value={pendingOrders}  subtitle="need attention"             icon={<Clock size={20} />}       color="amber"   className="animate-fade-in-up" />
+        <StatCard title="Occupancy Rate"    value={`${occupancyRate}%`} icon={<Hotel size={20} />}      color="navy"    className="animate-fade-in-up" />
+        <StatCard title="Revenue KPI"       value={revenueKPI ? formatCurrency(revenueKPI.currentValue) : '—'} icon={<TrendingUp size={20} />} color="emerald" className="animate-fade-in-up" />
+        <StatCard title="Active Staff"      value={activeStaff} subtitle={`of ${staff.length} total`}  icon={<Users size={20} />}      color="blue"    className="animate-fade-in-up" />
+        <StatCard title="Needs Attention"   value={forwardedOrders.length + completedByStaff.length} subtitle="requests awaiting action" icon={<Clock size={20} />} color="amber" className="animate-fade-in-up" />
       </div>
+
+      {/* ── Service Request Management ─────────────────────────── */}
+      {(forwardedOrders.length > 0 || completedByStaff.length > 0) && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Forwarded — needs staff assignment */}
+          <Card title="Assign to Staff" subtitle={`${forwardedOrders.length} forwarded from Front Desk`} icon={<UserCheck size={15} />}>
+            <div className="space-y-3">
+              {forwardedOrders.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">No requests to assign</p>
+              )}
+              {forwardedOrders.map((order) => (
+                <div key={order.orderId} className="p-3 rounded-xl border border-blue-100 bg-blue-50/40">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <p className="text-sm font-semibold text-gray-900">{order.serviceType.replace(/_/g, ' ')}</p>
+                    <Badge variant={statusBadge(order.status)}>{order.status.replace('_', ' ')}</Badge>
+                  </div>
+                  {order.description && <p className="text-xs text-gray-500 mb-2 truncate">{order.description}</p>}
+                  <div className="flex gap-2 items-center flex-wrap">
+                    <select
+                      value={assignMap[order.orderId] ?? ''}
+                      onChange={(e) => setAssignMap((m) => ({ ...m, [order.orderId]: e.target.value }))}
+                      className="select text-xs flex-1 min-w-[140px]">
+                      <option value="">— Select Staff —</option>
+                      {serviceStaff.map((u) => (
+                        <option key={u.userId} value={u.userId}>{u.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      disabled={!assignMap[order.orderId] || assignMutation.isPending}
+                      onClick={() => assignMutation.mutate({ orderId: order.orderId, userId: assignMap[order.orderId] })}
+                      className="px-3 py-1.5 text-xs font-semibold bg-navy-900 text-white rounded-lg hover:bg-navy-800 disabled:opacity-50 transition-colors">
+                      Assign
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Staff completed — needs verification */}
+          <Card title="Verify Completions" subtitle={`${completedByStaff.length} awaiting your verification`} icon={<CheckCircle2 size={15} />}>
+            <div className="space-y-3">
+              {completedByStaff.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">No completions to verify</p>
+              )}
+              {completedByStaff.map((order) => {
+                const wf = customStatuses[order.orderId];
+                return (
+                  <div key={order.orderId} className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/40">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <p className="text-sm font-semibold text-gray-900">{order.serviceType.replace(/_/g, ' ')}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">Staff Completed</span>
+                    </div>
+                    {wf?.assignedUserName && <p className="text-xs text-gray-500 mb-2">Completed by: {wf.assignedUserName}</p>}
+                    <button
+                      onClick={() => handleVerify(order.orderId)}
+                      className="px-3 py-1.5 text-xs font-semibold bg-emerald-700 text-white rounded-lg hover:bg-emerald-600 transition-colors">
+                      ✓ Verify & Send to Front Desk
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Occupancy meter */}
       <div className="bg-gradient-to-br from-navy-900 to-navy-800 rounded-2xl p-6 text-white">
@@ -84,10 +177,7 @@ export default function ManagerDashboard() {
           </div>
         </div>
         <div className="h-2.5 bg-white/10 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-gold-400 to-gold-500 rounded-full transition-all duration-700"
-            style={{ width: `${occupancyRate}%` }}
-          />
+          <div className="h-full bg-gradient-to-r from-gold-400 to-gold-500 rounded-full transition-all duration-700" style={{ width: `${occupancyRate}%` }} />
         </div>
         <div className="flex gap-4 mt-3">
           {roomGroups.map((g) => (
@@ -102,7 +192,7 @@ export default function ManagerDashboard() {
       {/* KPI chart */}
       {chartData.length > 0 && (
         <Card title="KPI Performance" subtitle="Current vs Target" icon={<BarChart3 size={16} />}>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={220}>
             <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -145,9 +235,7 @@ export default function ManagerDashboard() {
           action={<Link to="/manager/performance" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">Full Report <ArrowRight size={11} /></Link>}>
           <div className="space-y-3">
             {kpis.slice(0, 5).map((kpi) => {
-              const pct = Number(kpi.target) > 0
-                ? Math.min(100, Math.round((Number(kpi.currentValue) / Number(kpi.target)) * 100))
-                : 0;
+              const pct = Number(kpi.target) > 0 ? Math.min(100, Math.round((Number(kpi.currentValue) / Number(kpi.target)) * 100)) : 0;
               const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-rose-500';
               return (
                 <div key={kpi.kpiId}>

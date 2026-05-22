@@ -2,14 +2,16 @@ import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Home, Calendar, FileText, Bell, Star, Key, MessageSquare,
-  ClipboardList, BedDouble, Wrench, ShoppingCart, Leaf, Layers,
+  ClipboardList, BedDouble,
+  ShoppingCart, Leaf, Layers,
   DollarSign, RotateCcw, BarChart2, Users, Clock, TrendingUp, Hotel,
   Settings, Shield, DownloadCloud, PieChart, Table2, Award,
-  LogOut, ChevronLeft, ChevronRight, Building2, Sparkles,
+  LogOut, ChevronLeft, ChevronRight, Sparkles,
 } from 'lucide-react';
 import type { UserRole } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../utils/cn';
+import { hospeaseLogo } from './HospEaseLogo';
 
 interface NavItem { label: string; path: string; icon: React.ReactNode; }
 
@@ -31,7 +33,6 @@ const navConfig: Record<UserRole, NavItem[]> = {
     { label: 'Dashboard',   path: '/housekeeping',             icon: <Home size={17} /> },
     { label: 'Task List',   path: '/housekeeping/tasks',       icon: <ClipboardList size={17} /> },
     { label: 'Room Status', path: '/housekeeping/room-status', icon: <BedDouble size={17} /> },
-    { label: 'Maintenance', path: '/housekeeping/maintenance', icon: <Wrench size={17} /> },
   ],
   SERVICE_STAFF: [
     { label: 'Dashboard',   path: '/servicestaff',            icon: <Home size={17} /> },
@@ -115,8 +116,13 @@ export default function Sidebar() {
         'flex items-center border-b border-white/8 flex-shrink-0 h-[64px]',
         collapsed ? 'justify-center px-3' : 'px-5 gap-3'
       )}>
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center flex-shrink-0 shadow-lg">
-          <Building2 size={15} className="text-white" />
+        <div className="relative flex-shrink-0">
+          <img
+            src={hospeaseLogo}
+            alt="HospEase"
+            className="w-8 h-8 rounded-xl object-contain"
+          />
+          <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-br from-gold-400/20 to-gold-600/10 blur-sm pointer-events-none" />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
@@ -135,7 +141,7 @@ export default function Sidebar() {
             end={item.path.split('/').length === 2}
             className={({ isActive }) =>
               cn(
-                'nav-item group',
+                'nav-item group relative',
                 isActive ? 'nav-item-active' : 'nav-item-inactive',
                 collapsed && 'justify-center px-0'
               )
@@ -144,6 +150,10 @@ export default function Sidebar() {
           >
             {({ isActive }) => (
               <>
+                {/* Gold left indicator for active item */}
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gold-400 shadow-sm" style={{ boxShadow: '0 0 6px rgba(201,168,76,0.5)' }} />
+                )}
                 <span className={cn(
                   'flex-shrink-0 w-[34px] h-[34px] rounded-lg flex items-center justify-center transition-colors duration-150',
                   isActive

@@ -1,17 +1,42 @@
-import { Key, Calendar, Users, BedDouble, ArrowRight, LogIn, LogOut, CheckCircle2 } from 'lucide-react';
+import { Key, Calendar, Users, BedDouble, ArrowRight, LogIn, LogOut, CheckCircle2, Bell, Send } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
 import { reservationsApi } from '../../api/reservations';
 import { roomsApi } from '../../api/rooms';
+import { serviceOrdersApi } from '../../api/serviceOrders';
 import { formatDate, formatRelative } from '../../utils/formatters';
+import { useWorkflowStore } from '../../store/workflowStore';
+import { useToastStore } from '../../store/toastStore';
 
 export default function FrontDeskDashboard() {
   const today = new Date().toISOString().split('T')[0];
   const { data: reservations = [] } = useQuery({ queryKey: ['reservations'], queryFn: reservationsApi.getAll });
   const { data: rooms = [] }        = useQuery({ queryKey: ['rooms'],        queryFn: roomsApi.getAll });
+  const { data: serviceOrders = [] } = useQuery({ queryKey: ['service-orders'], queryFn: serviceOrdersApi.getAll });
+
+  const queryClient = useQueryClient();
+  const { customStatuses, setStatus, clearStatus } = useWorkflowStore();
+  const addToast = useToastStore((s) => s.addToast);
+
+  const closeMutation = useMutation({
+    mutationFn: (orderId: string) => serviceOrdersApi.updateStatus(orderId, 'COMPLETED'),
+    onSuccess: (_, orderId) => {
+      clearStatus(orderId);
+      queryClient.invalidateQueries({ queryKey: ['service-orders'] });
+      addToast('Request closed and billed successfully', 'success');
+    },
+  });
+
+  // Service requests that need front desk attention
+  const pendingRequests = serviceOrders.filter((o) =>
+    o.status === 'PENDING' && !customStatuses[o.orderId]
+  );
+  const verifiedRequests = serviceOrders.filter((o) =>
+    customStatuses[o.orderId]?.status === 'MANAGER_VERIFIED'
+  );
 
   const checkIns   = reservations.filter((r) => r.checkInDate  === today && (r.status === 'CONFIRMED' || r.status === 'CHECKED_IN'));
   const checkOuts  = reservations.filter((r) => r.checkOutDate === today && r.status === 'CHECKED_IN');
@@ -154,6 +179,61 @@ export default function FrontDeskDashboard() {
           </div>
         </Card>
       </div>
+
+      {/* Service Request Management */}
+      {(pendingRequests.length > 0 || verifiedRequests.length > 0) && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Pending — forward to manager */}
+          <Card title="Guest Requests" subtitle={`${pendingRequests.length} pending`} icon={<Bell size={15} />}>
+            <div className="space-y-2">
+              {pendingRequests.slice(0, 6).map((req) => (
+                <div key={req.orderId} className="flex items-center justify-between p-3 rounded-xl border border-gray-50 hover:border-gray-200 transition-all">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-gray-900">{req.serviceType.replace(/_/g, ' ')}</p>
+                    {req.description && <p className="text-xs text-gray-400 truncate mt-0.5">{req.description}</p>}
+                    <p className="text-xs text-gray-400 mt-0.5">{formatRelative(req.createdAt)}</p>
+                  </div>
+                  <button
+                    onClick={() => { setStatus(req.orderId, 'FORWARDED_TO_MANAGER'); addToast('Request forwarded to Manager', 'success'); }}
+                    className="px-3 py-1.5 text-xs font-semibold bg-navy-900 text-white rounded-lg hover:bg-navy-800 transition-colors flex items-center gap-1.5 flex-shrink-0 ml-3"
+                  >
+                    <Send size={11} /> Forward
+                  </button>
+                </div>
+              ))}
+              {pendingRequests.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No pending requests</p>}
+            </div>
+          </Card>
+
+          {/* Verified — close request */}
+          <Card title="Verified & Ready to Close" subtitle={`${verifiedRequests.length} verified`} icon={<CheckCircle2 size={15} />}>
+            <div className="space-y-2">
+              {verifiedRequests.slice(0, 6).map((req) => {
+                const wf = customStatuses[req.orderId];
+                return (
+                  <div key={req.orderId} className="flex items-center justify-between p-3 rounded-xl border border-emerald-100 bg-emerald-50/30">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-gray-900">{req.serviceType.replace(/_/g, ' ')}</p>
+                        <Badge variant="purple">Verified</Badge>
+                      </div>
+                      {wf?.assignedUserName && <p className="text-xs text-gray-500 mt-0.5">Completed by: {wf.assignedUserName}</p>}
+                    </div>
+                    <button
+                      onClick={() => closeMutation.mutate(req.orderId)}
+                      disabled={closeMutation.isPending}
+                      className="px-3 py-1.5 text-xs font-semibold bg-emerald-700 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors flex-shrink-0 ml-3"
+                    >
+                      ✓ Close
+                    </button>
+                  </div>
+                );
+              })}
+              {verifiedRequests.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No verified requests to close</p>}
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

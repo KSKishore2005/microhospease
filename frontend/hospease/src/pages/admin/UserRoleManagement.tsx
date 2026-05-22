@@ -36,7 +36,7 @@ const RBAC_MATRIX: Record<string, string[]> = {
   ADMINISTRATOR:              ['All Modules', 'User Management', 'System Config', 'Audit Logs'],
   MANAGER:                    ['Manager Dashboard', 'Staff Scheduling', 'Performance', 'Occupancy Reports', 'Front Desk View', 'Finance View'],
   FRONT_DESK_STAFF:           ['Reservations', 'Check In/Out', 'Guest Communications'],
-  HOUSEKEEPING_STAFF:         ['Task Management', 'Room Status', 'Maintenance Requests'],
+  HOUSEKEEPING_STAFF:         ['Task Management', 'Room Status Board'],
   RESTAURANT_SERVICE_STAFF:   ['F&B Orders', 'Spa Bookings', 'Service Fulfillment'],
   FINANCE_OFFICER:            ['Invoices', 'Payments', 'Refunds', 'Reconciliation'],
   AUDITOR:                    ['KPI Dashboards', 'Scheduled Reports', 'Compliance Exports'],

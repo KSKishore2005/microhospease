@@ -3,7 +3,7 @@
 # HospEase - PowerShell Microservice Launcher
 # ============================================================
 $ROOT = $PSScriptRoot
-$env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
+$env:JAVA_HOME = "C:\Users\Kishore\Downloads\jdk-21.0.10"
 $env:PATH += ";C:\Users\Kishore\.m2\wrapper\dists\apache-maven-3.9.15\0226a00282e400185496f3b60ec5a3f029cbdc6893912937d4876d57695224e1\bin"
 
 function Start-Service($name, $waitSec) {

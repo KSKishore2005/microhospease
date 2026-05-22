@@ -6,23 +6,42 @@ import Table from '../../components/common/Table';
 import Badge from '../../components/common/Badge';
 import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
+import Modal from '../../components/common/Modal';
 import { invoicesApi } from '../../api/invoices';
 import { paymentsApi } from '../../api/payments';
+import type { PaymentMethod } from '../../api/payments';
 import { formatDate, formatCurrency } from '../../utils/formatters';
+import { useToastStore } from '../../store/toastStore';
 
 type Tab = 'INVOICES' | 'PAYMENTS';
 
 export default function InvoicesPayments() {
   const [tab, setTab] = useState<Tab>('INVOICES');
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CREDIT_CARD');
+  const [paymentAmount, setPaymentAmount] = useState<number>(0);
 
   const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
 
   const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: invoicesApi.getAll });
   const { data: payments = [] } = useQuery({ queryKey: ['payments'], queryFn: paymentsApi.getAll });
 
-  const markPaidMutation = useMutation({
-    mutationFn: (id: string) => invoicesApi.markPaid(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+  const payInvoiceMutation = useMutation({
+    mutationFn: ({ invoiceId, guestId, amount, method }: { invoiceId: string; guestId: string; amount: number; method: PaymentMethod }) =>
+      paymentsApi.create(invoiceId, guestId, { amount, method }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      addToast('Payment recorded successfully!', 'success');
+      setIsPaymentModalOpen(false);
+      setSelectedInvoice(null);
+    },
+    onError: (err: any) => {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to record payment.';
+      addToast(errMsg, 'error');
+    }
   });
 
   const invoiceColumns = [
@@ -42,7 +61,12 @@ export default function InvoicesPayments() {
       key: 'invoiceId', label: 'Action',
       render: (_v: unknown, row: Record<string, unknown>) => (
         row['status'] !== 'PAID' ? (
-          <Button size="xs" variant="ghost" onClick={() => markPaidMutation.mutate(String(row['invoiceId']))}>
+          <Button size="xs" variant="ghost" onClick={() => {
+            setSelectedInvoice(row);
+            setPaymentAmount(Number(row['balanceDue']));
+            setPaymentMethod('CREDIT_CARD');
+            setIsPaymentModalOpen(true);
+          }}>
             Mark Paid
           </Button>
         ) : (
@@ -74,7 +98,20 @@ export default function InvoicesPayments() {
     { key: 'invoiceId', label: 'Invoice', sortable: true },
     { key: 'guestId', label: 'Guest ID' },
     { key: 'paidAt', label: 'Paid At', sortable: true, render: (v: unknown) => v ? formatDate(String(v)) : '—' },
-    { key: 'method', label: 'Method' },
+    {
+      key: 'method',
+      label: 'Method',
+      render: (v: unknown) => {
+        const methodStr = String(v);
+        const config: Record<string, { label: string; bg: string }> = {
+          CASH: { label: '💵 Cash', bg: 'bg-emerald-50 text-emerald-700 border border-emerald-100' },
+          CREDIT_CARD: { label: '💳 Credit Card', bg: 'bg-blue-50 text-blue-700 border border-blue-100' },
+          DEBIT_CARD: { label: '🏦 Debit Card', bg: 'bg-indigo-50 text-indigo-700 border border-indigo-100' },
+        };
+        const current = config[methodStr] || { label: methodStr, bg: 'bg-gray-50 text-gray-700' };
+        return <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${current.bg}`}>{current.label}</span>;
+      }
+    },
     { key: 'amount', label: 'Amount', render: (v: unknown) => <span className="text-emerald-700 font-bold">{formatCurrency(Number(v))}</span> },
     { key: 'status', label: 'Status', render: (v: unknown) => <Badge variant={statusBadge(String(v))} dot>{String(v)}</Badge> },
   ];
@@ -163,6 +200,81 @@ export default function InvoicesPayments() {
           )}
         </div>
       </Card>
+
+      {/* Payment Selection Modal */}
+      <Modal
+        open={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        title="Record Payment"
+        subtitle={`Invoice #${selectedInvoice?.invoiceId?.slice(0, 8)} | Guest ID: ${selectedInvoice?.guestId}`}
+        footer={
+          <div className="flex gap-2 justify-end w-full">
+            <Button variant="secondary" size="sm" onClick={() => setIsPaymentModalOpen(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              size="sm"
+              loading={payInvoiceMutation.isPending}
+              onClick={() => {
+                if (selectedInvoice) {
+                  payInvoiceMutation.mutate({
+                    invoiceId: String(selectedInvoice.invoiceId),
+                    guestId: String(selectedInvoice.guestId),
+                    amount: paymentAmount,
+                    method: paymentMethod,
+                  });
+                }
+              }}
+            >
+              Confirm Payment
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase">Outstanding Balance</label>
+            <p className="text-xl font-bold text-rose-600 mt-1">{formatCurrency(Number(selectedInvoice?.balanceDue ?? 0))}</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Payment Method</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'CASH', label: 'Cash', icon: '💵' },
+                { value: 'CREDIT_CARD', label: 'Credit Card', icon: '💳' },
+                { value: 'DEBIT_CARD', label: 'Debit Card', icon: '🏦' }
+              ].map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setPaymentMethod(m.value as PaymentMethod)}
+                  className={`p-3 rounded-xl border text-center flex flex-col items-center gap-1.5 transition-all text-xs font-semibold ${
+                    paymentMethod === m.value
+                      ? 'border-gold-500 bg-gold-50/20 text-gold-700 shadow-sm'
+                      : 'border-gray-100 hover:border-gray-200 text-gray-600 bg-white'
+                  }`}
+                >
+                  <span className="text-lg">{m.icon}</span>
+                  <span>{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Amount to Pay ($)</label>
+            <input
+              type="number"
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+              max={Number(selectedInvoice?.balanceDue ?? 0)}
+              min={0.01}
+              step={0.01}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-navy-500 font-semibold"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

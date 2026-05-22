@@ -1,4 +1,4 @@
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore, type AppNotification } from '../../store/notificationStore';
 import { useState, useEffect, useRef } from 'react';
@@ -25,6 +25,15 @@ const roleGradients: Record<string, string> = {
   REPORTING: 'from-indigo-500 to-blue-400', GUEST: 'from-amber-500 to-yellow-400',
 };
 
+const notifTypeIcons: Record<string, string> = {
+  booking: '🏨',
+  service: '🛎️',
+  payment: '💳',
+  system: '⚙️',
+  task: '📋',
+  housekeeping: '🧹',
+};
+
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -40,12 +49,13 @@ function formatRelativeShort(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return `${diff}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 export default function Header() {
   const { user } = useAuthStore();
-  const { notifications, addNotification, markAllRead, getUnread } = useNotificationStore();
+  const { addNotification, markOneRead, markAllRead, getUnread } = useNotificationStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +64,7 @@ export default function Header() {
   const initials = user?.name?.trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? 'U';
   const unread = getUnread();
 
-  // ── Polling ──────────────────────────────────────────────────────────────────
+  // ── Polling ──────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
 
@@ -63,29 +73,44 @@ export default function Header() {
         if (user.role === 'FRONT_DESK' || user.role === 'MANAGER' || user.role === 'ADMIN') {
           const orders = await serviceOrdersApi.getByStatus('PENDING');
           orders.slice(0, 5).forEach((o) =>
-            addNotification({ id: `so-${o.orderId}`, title: 'New Service Request', body: o.serviceType.replace(/_/g, ' '), dot: 'bg-rose-500', createdAt: o.createdAt })
+            addNotification({ id: `so-${o.orderId}`, title: 'New Service Request', body: o.serviceType.replace(/_/g, ' '), dot: 'bg-rose-500', createdAt: o.createdAt, type: 'service' })
           );
           const reservations = await reservationsApi.getByStatus('CONFIRMED');
           reservations.slice(0, 5).forEach((r) =>
-            addNotification({ id: `res-${r.reservationId}`, title: 'Reservation Confirmed', body: `${r.guestName} — Room ${r.roomNumber}`, dot: 'bg-emerald-500', createdAt: r.createdAt })
+            addNotification({ id: `res-${r.reservationId}`, title: 'Reservation Confirmed', body: `${r.guestName} — Room ${r.roomNumber}`, dot: 'bg-emerald-500', createdAt: r.createdAt, type: 'booking' })
           );
         }
         if (user.role === 'SERVICE_STAFF') {
           const orders = await serviceOrdersApi.getByAssignee(user.id);
           orders.filter(o => o.status === 'CONFIRMED').slice(0, 5).forEach((o) =>
-            addNotification({ id: `mine-${o.orderId}`, title: 'Task Assigned to You', body: o.serviceType.replace(/_/g, ' '), dot: 'bg-blue-500', createdAt: o.createdAt })
+            addNotification({ id: `mine-${o.orderId}`, title: 'Task Assigned to You', body: o.serviceType.replace(/_/g, ' '), dot: 'bg-blue-500', createdAt: o.createdAt, type: 'task' })
           );
+        }
+        if (user.role === 'GUEST') {
+          try {
+            const guestId = useAuthStore.getState().guestId;
+            if (guestId) {
+              const orders = await serviceOrdersApi.getByGuest(guestId);
+              orders.filter(o => o.status === 'COMPLETED').slice(0, 3).forEach((o) =>
+                addNotification({ id: `guest-done-${o.orderId}`, title: 'Service Completed', body: o.serviceType.replace(/_/g, ' '), dot: 'bg-emerald-500', createdAt: o.createdAt, type: 'service' })
+              );
+              const reservations = await reservationsApi.getByGuest(guestId);
+              reservations.filter(r => r.status === 'CONFIRMED').slice(0, 3).forEach((r) =>
+                addNotification({ id: `guest-res-${r.reservationId}`, title: 'Booking Confirmed', body: `Room ${r.roomNumber} — ${r.roomType}`, dot: 'bg-blue-500', createdAt: r.createdAt, type: 'booking' })
+              );
+            }
+          } catch { /* guest service may be offline */ }
         }
         if (user.role === 'HOUSEKEEPING' || user.role === 'MANAGER' || user.role === 'ADMIN') {
           const tasks = await housekeepingApi.getByStatus('PENDING');
           tasks.slice(0, 5).forEach((t) =>
-            addNotification({ id: `hk-${t.taskId}`, title: 'Housekeeping Task Pending', body: `Room ${t.roomId}`, dot: 'bg-amber-500', createdAt: t.scheduledAt })
+            addNotification({ id: `hk-${t.taskId}`, title: 'Housekeeping Task Pending', body: `Room ${t.roomId}`, dot: 'bg-amber-500', createdAt: t.scheduledAt, type: 'housekeeping' })
           );
         }
         if (user.role === 'FINANCE' || user.role === 'MANAGER' || user.role === 'ADMIN') {
           const invs = await invoicesApi.getByStatus('UNPAID');
           invs.slice(0, 5).forEach((i) =>
-            addNotification({ id: `inv-${i.invoiceId}`, title: 'Unpaid Invoice', body: `Balance due`, dot: 'bg-teal-500', createdAt: i.issuedAt })
+            addNotification({ id: `inv-${i.invoiceId}`, title: 'Unpaid Invoice', body: `Balance due`, dot: 'bg-teal-500', createdAt: i.issuedAt, type: 'payment' })
           );
         }
       } catch { /* silent — services may be offline */ }
@@ -128,38 +153,65 @@ export default function Header() {
         {/* Notification bell */}
         <div className="relative" ref={panelRef}>
           <button onClick={() => setNotifOpen(!notifOpen)}
-            className="relative w-9 h-9 rounded-xl flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors">
-            <Bell size={17} />
+            className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 ${
+              unread.length > 0
+                ? 'text-gold-600 hover:bg-gold-50 hover:text-gold-700'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+            }`}>
+            <Bell size={17} className={unread.length > 0 ? 'bell-ring' : ''} />
             {unread.length > 0 && (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-0.5 bg-rose-500 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-white">
+              <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-rose-500 to-rose-600 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-white shadow-sm">
                 {unread.length > 9 ? '9+' : unread.length}
               </span>
             )}
           </button>
 
           {notifOpen && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 animate-scale-in">
-              <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-900">Notifications {unread.length > 0 && <span className="ml-1 text-xs text-rose-500">({unread.length} new)</span>}</p>
-                <span onClick={markAllRead} className="text-xs text-navy-600 font-medium cursor-pointer hover:underline">Mark all read</span>
+            <div className="absolute right-0 top-full mt-2 w-[340px] notif-panel rounded-2xl shadow-2xl z-50 animate-slide-down overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100/80 flex items-center justify-between bg-gradient-to-r from-navy-900 to-navy-800 text-white">
+                <div className="flex items-center gap-2">
+                  <Bell size={14} className="text-gold-400" />
+                  <p className="text-sm font-semibold">Notifications</p>
+                  {unread.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-full">{unread.length}</span>
+                  )}
+                </div>
+                {unread.length > 0 && (
+                  <span onClick={markAllRead} className="text-[11px] text-gold-400 font-medium cursor-pointer hover:underline">Clear all</span>
+                )}
               </div>
-              <div className="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+              <div className="divide-y divide-gray-50/80 max-h-80 overflow-y-auto bg-white/95">
                 {unread.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-8">No new notifications</p>
-                ) : unread.slice(0, 8).map((n: AppNotification) => (
-                  <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors">
-                    <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${n.dot}`} />
+                  <div className="py-12 text-center">
+                    <Bell size={28} className="text-gray-200 mx-auto mb-2" />
+                    <p className="text-xs text-gray-400 font-medium">No new notifications</p>
+                    <p className="text-[10px] text-gray-300 mt-0.5">You're all caught up!</p>
+                  </div>
+                ) : unread.slice(0, 10).map((n: AppNotification) => (
+                  <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50/80 transition-colors group">
+                    <span className="text-base mt-0.5 flex-shrink-0">{notifTypeIcons[n.type ?? 'system'] ?? '🔔'}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-800">{n.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5 truncate">{n.body}</p>
-                      <p className="text-[10px] text-gray-400 mt-0.5">{formatRelativeShort(n.createdAt)}</p>
+                      <p className="text-xs font-semibold text-gray-800 leading-tight">{n.title}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">{n.body}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{formatRelativeShort(n.createdAt)}</p>
                     </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); markOneRead(n.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-all flex-shrink-0"
+                      title="Dismiss"
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                 ))}
               </div>
-              <div className="p-3 border-t border-gray-50 text-center">
-                <span onClick={() => { markAllRead(); setNotifOpen(false); }} className="text-xs text-navy-600 font-medium cursor-pointer hover:underline">Clear all</span>
-              </div>
+              {unread.length > 0 && (
+                <div className="p-2.5 border-t border-gray-100/80 text-center bg-gray-50/50">
+                  <span onClick={() => { markAllRead(); setNotifOpen(false); }} className="text-[11px] text-navy-600 font-semibold cursor-pointer hover:underline">
+                    Mark all as read
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>

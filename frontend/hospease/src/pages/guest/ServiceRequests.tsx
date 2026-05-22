@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Bell } from 'lucide-react';
+import { Plus, Bell, CheckCircle2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
@@ -10,6 +10,7 @@ import { serviceOrdersApi, type ServiceType } from '../../api/serviceOrders';
 import { reservationsApi } from '../../api/reservations';
 import { useEffectiveGuestId } from '../../hooks/useEffectiveGuestId';
 import { formatDate, formatRelative } from '../../utils/formatters';
+import { useWorkflowStore } from '../../store/workflowStore';
 
 const SERVICE_TYPES: { type: ServiceType; label: string; icon: string }[] = [
   { type: 'ROOM_SERVICE',  label: 'Room Service',  icon: '🍽️' },
@@ -30,6 +31,7 @@ const TYPE_ICON: Record<string, string> = Object.fromEntries(
 export default function ServiceRequests() {
   const { effectiveGuestId: guestId } = useEffectiveGuestId();
   const queryClient = useQueryClient();
+  const { customStatuses } = useWorkflowStore();
 
   const [showNew,       setShowNew]       = useState(false);
   const [serviceType,   setServiceType]   = useState<ServiceType>('ROOM_SERVICE');
@@ -131,12 +133,14 @@ export default function ServiceRequests() {
         ) : (
           <div className="divide-y divide-gray-50">
             {orders.map((req) => (
-              <div key={req.orderId} className="p-5 flex items-start gap-4">
+              <div key={req.orderId} className="p-5 flex items-start gap-4 hover:bg-gray-50/50 transition-colors">
                 <div className="text-2xl shrink-0">{TYPE_ICON[req.serviceType] ?? '📋'}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-900 text-sm">{req.serviceType.replace(/_/g, ' ')}</p>
-                    <Badge variant={statusBadge(req.status)}>{req.status.replace('_', ' ')}</Badge>
+                    <Badge variant={statusBadge(customStatuses[req.orderId]?.status ?? req.status)}>
+                      {(customStatuses[req.orderId]?.status ?? req.status).replace(/_/g, ' ')}
+                    </Badge>
                   </div>
                   {req.description && (
                     <p className="text-sm text-gray-600 mt-1 line-clamp-2">{req.description}</p>
@@ -144,7 +148,22 @@ export default function ServiceRequests() {
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 flex-wrap">
                     <span>Submitted {formatRelative(req.createdAt)}</span>
                     {req.room && <span>Room {req.room.number}</span>}
-                    {req.price > 0 && <span className="text-navy-700 font-medium">Price set: ${req.price}</span>}
+                  </div>
+                  {/* Workflow timeline */}
+                  <div className="flex items-center gap-1 mt-3">
+                    {[
+                      { label: 'Submitted', done: true },
+                      { label: 'Front Desk', done: !!customStatuses[req.orderId] || req.status === 'CONFIRMED' || req.status === 'IN_PROGRESS' || req.status === 'COMPLETED' },
+                      { label: 'Manager', done: ['STAFF_ASSIGNED', 'STAFF_COMPLETED', 'MANAGER_VERIFIED'].includes(customStatuses[req.orderId]?.status ?? '') },
+                      { label: 'Staff', done: ['STAFF_COMPLETED', 'MANAGER_VERIFIED'].includes(customStatuses[req.orderId]?.status ?? '') || req.status === 'COMPLETED' },
+                      { label: 'Completed', done: req.status === 'COMPLETED' || customStatuses[req.orderId]?.status === 'MANAGER_VERIFIED' },
+                    ].map((step, i) => (
+                      <div key={step.label} className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${step.done ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+                        <span className={`text-[10px] font-medium ${step.done ? 'text-emerald-600' : 'text-gray-300'}`}>{step.label}</span>
+                        {i < 4 && <div className={`w-3 h-px ${step.done ? 'bg-emerald-300' : 'bg-gray-200'}`} />}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

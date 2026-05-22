@@ -1,4 +1,4 @@
-import { ClipboardList, BedDouble, Wrench, CheckCircle2, Clock, AlertTriangle, ArrowRight, Sparkles } from 'lucide-react';
+import { ClipboardList, BedDouble, CheckCircle2, Clock, ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
@@ -6,17 +6,14 @@ import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
 import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';
-import { serviceOrdersApi } from '../../api/serviceOrders';
 import { formatRelative } from '../../utils/formatters';
 import { useMemo } from 'react';
+import { useRoomStatusStore } from '../../store/roomStatusStore';
 
 export default function HousekeepingDashboard() {
   const { data: tasks = [] }  = useQuery({ queryKey: ['housekeeping'],              queryFn: housekeepingApi.getAll });
   const { data: rooms = [] }  = useQuery({ queryKey: ['rooms'],                     queryFn: roomsApi.getAll });
-  const { data: maintOrders = [] } = useQuery({
-    queryKey: ['service-orders', 'MAINTENANCE'],
-    queryFn: () => serviceOrdersApi.getByType('MAINTENANCE'),
-  });
+  const { roomFlags } = useRoomStatusStore();
 
   const roomMap = useMemo(
     () => Object.fromEntries(rooms.map((r) => [r.roomId, r.number])),
@@ -26,7 +23,16 @@ export default function HousekeepingDashboard() {
   const pending    = tasks.filter((t) => t.status === 'PENDING').length;
   const inProgress = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
   const completed  = tasks.filter((t) => t.status === 'COMPLETED').length;
-  const openMaint  = maintOrders.filter((m) => m.status === 'PENDING' || m.status === 'IN_PROGRESS').length;
+
+  const roomsReady = useMemo(() => {
+    return rooms.filter((r) => {
+      if (r.status === 'AVAILABLE') {
+        const flag = roomFlags[r.roomId];
+        return flag === 'CLEAN' || flag === 'READY' || !flag;
+      }
+      return false;
+    }).length;
+  }, [rooms, roomFlags]);
 
   const cleaningRooms     = rooms.filter((r) => r.status === 'CLEANING').length;
   const availableRooms    = rooms.filter((r) => r.status === 'AVAILABLE').length;
@@ -36,7 +42,21 @@ export default function HousekeepingDashboard() {
   const total     = tasks.length;
   const progress  = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const activeMaint = maintOrders.filter((m) => m.status !== 'COMPLETED' && m.status !== 'CANCELLED');
+  const activeRoomsToClean = useMemo(() => {
+    return rooms
+      .map((r) => {
+        let displayStatus = 'CLEAN';
+        if (r.status === 'OCCUPIED') displayStatus = 'OCCUPIED';
+        else if (r.status === 'MAINTENANCE') displayStatus = 'DIRTY';
+        else if (r.status === 'CLEANING') displayStatus = 'CLEANING';
+        else if (r.status === 'AVAILABLE') {
+          const flag = roomFlags[r.roomId];
+          displayStatus = flag || 'CLEAN';
+        }
+        return { ...r, displayStatus };
+      })
+      .filter((r) => r.displayStatus === 'DIRTY' || r.displayStatus === 'CLEANING');
+  }, [rooms, roomFlags]);
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -56,7 +76,7 @@ export default function HousekeepingDashboard() {
         <StatCard title="Pending Tasks"    value={pending}    icon={<ClipboardList size={20} />} color="amber"   className="animate-fade-in-up" />
         <StatCard title="In Progress"      value={inProgress} icon={<Clock size={20} />}         color="blue"    className="animate-fade-in-up" />
         <StatCard title="Completed Today"  value={completed}  icon={<CheckCircle2 size={20} />}  color="emerald" className="animate-fade-in-up" />
-        <StatCard title="Open Maintenance" value={openMaint}  icon={<Wrench size={20} />}        color="rose"    className="animate-fade-in-up" />
+        <StatCard title="Rooms Ready"      value={roomsReady} icon={<Sparkles size={20} />}     color="emerald" className="animate-fade-in-up" />
       </div>
 
       {/* Progress + room status */}
@@ -144,29 +164,30 @@ export default function HousekeepingDashboard() {
           </div>
         </Card>
 
-        {/* Maintenance alerts */}
-        <Card title="Maintenance Alerts" icon={<Wrench size={16} />}
-          action={<Link to="/housekeeping/maintenance" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">View All <ArrowRight size={11} /></Link>}>
+        {/* Rooms Needing Cleaning */}
+        <Card title="Rooms to Clean" icon={<Sparkles size={16} />}
+          action={<Link to="/housekeeping/room-status" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">Room Status <ArrowRight size={11} /></Link>}>
           <div className="space-y-2">
-            {activeMaint.slice(0, 6).map((m) => (
-              <div key={m.orderId} className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle size={14} className="text-amber-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-gray-900">{m.serviceType.replace(/_/g, ' ')}</p>
-                    <Badge variant={statusBadge(m.status)}>{m.status.replace('_', ' ')}</Badge>
+            {activeRoomsToClean.slice(0, 7).map((r) => (
+              <div key={r.roomId} className="flex items-center justify-between p-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-amber-600">{r.number}</span>
                   </div>
-                  {m.description && <p className="text-xs text-gray-400 mt-0.5 truncate">{m.description}</p>}
-                  <p className="text-xs text-gray-400 mt-0.5">{formatRelative(m.createdAt)}</p>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Room {r.number}</p>
+                    <p className="text-xs text-gray-400">{r.type}</p>
+                  </div>
                 </div>
+                <Badge variant={r.displayStatus === 'DIRTY' ? 'danger' : 'warning'}>
+                  {r.displayStatus.replace('_', ' ')}
+                </Badge>
               </div>
             ))}
-            {activeMaint.length === 0 && (
+            {activeRoomsToClean.length === 0 && (
               <div className="text-center py-10">
                 <CheckCircle2 size={28} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">No active maintenance issues</p>
+                <p className="text-sm text-gray-400">All rooms are clean and ready!</p>
               </div>
             )}
           </div>

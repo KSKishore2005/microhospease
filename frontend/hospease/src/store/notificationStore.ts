@@ -1,18 +1,23 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type NotifType = 'booking' | 'service' | 'payment' | 'system' | 'task' | 'housekeeping';
+
 export interface AppNotification {
   id: string;
   title: string;
   body: string;
   dot: string;   // tailwind bg color class e.g. 'bg-emerald-500'
   createdAt: string;
+  type?: NotifType;
+  role?: string;
 }
 
 interface NotificationState {
   notifications: AppNotification[];
   dismissedIds: string[];
   addNotification: (n: AppNotification) => void;
+  markOneRead: (id: string) => void;
   markAllRead: () => void;
   getUnread: () => AppNotification[];
 }
@@ -29,6 +34,12 @@ export const useNotificationStore = create<NotificationState>()(
           if (s.dismissedIds.includes(n.id)) return s;
           return { notifications: [n, ...s.notifications].slice(0, 50) };
         }),
+
+      markOneRead: (id) =>
+        set((s) => ({
+          dismissedIds: [...new Set([...s.dismissedIds, id])],
+          notifications: s.notifications.filter((n) => n.id !== id),
+        })),
 
       markAllRead: () =>
         set((s) => ({

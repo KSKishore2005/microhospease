@@ -30,7 +30,9 @@ export default function ManagerDashboard() {
 
   const [assignMap, setAssignMap] = useState<Record<string, string>>({});
 
-  const serviceStaff = allUsers.filter((u) => u.role === 'RESTAURANT_SERVICE_STAFF' && u.status === 'ACTIVE');
+  const serviceStaff = allUsers.filter(
+    (u) => (u.role === 'RESTAURANT_SERVICE_STAFF' || u.role === 'SERVICE_STAFF') && u.status === 'ACTIVE'
+  );
 
   const assignMutation = useMutation({
     mutationFn: ({ orderId, userId }: { orderId: string; userId: string }) =>

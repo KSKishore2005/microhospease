@@ -23,7 +23,6 @@ import GuestCommunications from '../pages/frontdesk/GuestCommunications';
 import HousekeepingDashboard from '../pages/housekeeping/HousekeepingDashboard';
 import TaskList from '../pages/housekeeping/TaskList';
 import RoomStatus from '../pages/housekeeping/RoomStatus';
-import MaintenanceRequests from '../pages/housekeeping/MaintenanceRequests';
 
 import ServiceStaffDashboard from '../pages/servicestaff/ServiceStaffDashboard';
 import FBOrders from '../pages/servicestaff/FBOrders';
@@ -112,7 +111,6 @@ const router = createBrowserRouter([
       { index: true, element: <HousekeepingDashboard /> },
       { path: 'tasks', element: <TaskList /> },
       { path: 'room-status', element: <RoomStatus /> },
-      { path: 'maintenance', element: <MaintenanceRequests /> },
     ],
   },
 

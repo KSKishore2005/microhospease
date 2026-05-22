@@ -4,6 +4,8 @@ REM HospEase - Start All Microservices
 REM ============================================================
 
 set ROOT=%~dp0
+set "JAVA_HOME=C:\Users\Kishore\Downloads\jdk-21.0.10"
+set "PATH=%JAVA_HOME%\bin;%PATH%"
 
 echo ============================================================
 echo HospEase Microservices Startup

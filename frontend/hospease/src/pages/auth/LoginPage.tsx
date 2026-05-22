@@ -1,7 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
-import { Building2, Eye, EyeOff, ArrowRight, Zap, Shield, BarChart3, Users } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Zap, Shield, BarChart3, Users } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { hospeaseLogo } from '../../components/common/HospEaseLogo';
 
 /* ─── Demo accounts ───────────────────────────────────────── */
 const DEMO_ACCOUNTS = [
@@ -101,10 +102,10 @@ export default function LoginPage() {
           {/* Logo */}
           <div className={`flex items-center gap-3 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
             <div className="relative">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl" style={{ background: 'linear-gradient(135deg, #c9a227, #f0c040)' }}>
-                <Building2 size={22} className="text-white drop-shadow" />
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #c9a227, #f0c040)' }}>
+                <img src={hospeaseLogo} alt="HospEase" className="w-10 h-10 object-contain" />
               </div>
-              <div className="absolute -inset-1 rounded-2xl blur-sm opacity-40" style={{ background: 'linear-gradient(135deg, #c9a227, #f0c040)' }} />
+              <div className="absolute -inset-1 rounded-2xl blur-sm opacity-40 animate-pulse-glow" style={{ background: 'linear-gradient(135deg, #c9a227, #f0c040)' }} />
             </div>
             <div>
               <p className="text-white font-bold text-xl tracking-tight">HospEase</p>
@@ -177,8 +178,8 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0a0f1e, #1a2744)' }}>
-              <Building2 size={18} className="text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden" style={{ background: 'linear-gradient(135deg, #0a0f1e, #1a2744)' }}>
+              <img src={hospeaseLogo} alt="HospEase" className="w-8 h-8 object-contain" />
             </div>
             <span className="font-bold text-gray-900 text-xl">HospEase</span>
           </div>

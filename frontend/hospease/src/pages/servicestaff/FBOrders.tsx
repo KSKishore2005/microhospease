@@ -262,13 +262,15 @@ export default function FBOrders() {
           </div>
 
           {/* Price */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Total Amount ($)</label>
-            <input type="number" min="0" step="0.01" value={form.price}
-              onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-              placeholder="0.00"
-              className="input" />
-          </div>
+          {!isServiceStaff && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Total Amount ($)</label>
+              <input type="number" min="0" step="0.01" value={form.price}
+                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                placeholder="0.00"
+                className="input" />
+            </div>
+          )}
         </div>
       </Modal>
     </div>

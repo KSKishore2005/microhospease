@@ -261,11 +261,11 @@ export default function SpaGymBookings() {
               ['Service', selected.serviceType.replace('_', ' ')],
               ['Order ID', selected.orderId],
               ['Room ID', selected.roomId || 'N/A'],
-              ['Price', selected.price > 0 ? formatCurrency(selected.price) : 'N/A'],
+              ...(!isServiceStaff ? [['Price', selected.price > 0 ? formatCurrency(selected.price) : 'N/A']] : []),
               ['Status', <Badge key="s" variant={statusBadge(selected.status)}>{selected.status.replace('_', ' ')}</Badge>],
               ['Created', formatDate(selected.createdAt)],
             ].map(([l, v], i) => (
-              <div key={i} className="flex items-center gap-2"><span className="text-gray-500 w-20 flex-shrink-0">{l}</span><span className="font-medium text-gray-900">{v}</span></div>
+              <div key={i} className="flex items-center gap-2"><span className="text-gray-500 w-20 flex-shrink-0">{l as string}</span><span className="font-medium text-gray-900">{v}</span></div>
             ))}
             {selected.description && <div className="p-3 bg-amber-50 rounded-lg text-amber-700 text-xs">{selected.description}</div>}
           </div>
@@ -336,13 +336,15 @@ export default function SpaGymBookings() {
           </div>
 
           {/* Price */}
-          <div>
-            <label className="input-label">Price ($)</label>
-            <input type="number" min="0" step="0.01" value={form.price}
-              onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-              placeholder="0.00"
-              className="input" />
-          </div>
+          {!isServiceStaff && (
+            <div>
+              <label className="input-label">Price ($)</label>
+              <input type="number" min="0" step="0.01" value={form.price}
+                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
+                placeholder="0.00"
+                className="input" />
+            </div>
+          )}
         </div>
       </Modal>
     </div>

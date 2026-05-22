@@ -98,6 +98,26 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
+      {/* Billing Policy Formula Banner */}
+      <div className="bg-gradient-to-r from-navy-900 via-navy-950 to-navy-900 border border-gold-400/20 rounded-2xl p-4 text-white shadow-md relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-32 h-32 bg-gold-400/5 rounded-full blur-2xl pointer-events-none" />
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h2 className="text-xs font-semibold text-gold-400 tracking-wider uppercase">Standard Billing Policy Formula</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Automated calculations synced from active reservations and completed services</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 bg-white/5 px-4 py-2.5 rounded-xl border border-white/5 backdrop-blur-xs font-mono text-xs md:text-sm">
+            <span className="text-gray-300">Room Charges</span>
+            <span className="text-gold-400 font-bold">+</span>
+            <span className="text-gray-300">Service Charges</span>
+            <span className="text-gold-400 font-bold">+</span>
+            <span className="text-gray-300">Taxes (10%)</span>
+            <span className="text-gold-400 font-bold">=</span>
+            <span className="text-emerald-400 font-bold">Final Amount</span>
+          </div>
+        </div>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
         <StatCard title="Total Collected"  value={formatCurrency(totalRevenue)}     icon={<TrendingUp size={20} />}   color="emerald" trend={{ value: 8.3, label: 'vs last week' }} className="animate-fade-in-up" />

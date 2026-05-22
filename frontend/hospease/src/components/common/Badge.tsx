@@ -59,6 +59,9 @@ export function statusBadge(status: string): Variant {
     EARN: 'success', REDEEM: 'info', EXPIRE: 'danger', BONUS: 'warning',
     SCHEDULED: 'info', SWAPPED: 'warning', ABSENT: 'danger',
     NO_SHOW: 'danger',
+    FORWARDED_TO_MANAGER: 'info', STAFF_ASSIGNED: 'info',
+    STAFF_COMPLETED: 'warning', MANAGER_VERIFIED: 'purple',
+    UNPAID: 'danger',
   };
   return map[status] ?? 'default';
 }

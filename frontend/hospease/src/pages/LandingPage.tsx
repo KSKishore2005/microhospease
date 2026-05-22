@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRight, Star, Shield, Coffee, Sparkles, Activity,
-  MapPin, Menu, X, Phone, Mail, Clock, ChevronDown,
-  Users, Key, ClipboardList, DollarSign, BarChart3, CheckCircle2
+  MapPin, Menu, X, Phone, Mail, Clock, ChevronDown
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { hospeaseLogo } from '../components/common/HospEaseLogo';
@@ -312,42 +311,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── Enterprise Workflow Section ──────────────────────────── */}
-      <section className="py-20 bg-slate-950">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-14">
-            <p className="text-amber-400 text-xs font-black tracking-widest uppercase mb-3">Enterprise Workflow</p>
-            <h2 className="text-3xl md:text-5xl font-black text-white">Seamless Hotel Operations</h2>
-            <p className="text-gray-400 text-base mt-3 max-w-lg mx-auto">Every department connected. Every request tracked. From reservation to checkout.</p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {[
-              { icon: <Users size={20} />, label: 'Guest Portal', desc: 'Book & request services' },
-              { icon: <Key size={20} />, label: 'Front Desk', desc: 'Check-in & manage guests' },
-              { icon: <ClipboardList size={20} />, label: 'Manager', desc: 'Assign & verify tasks' },
-              { icon: <Sparkles size={20} />, label: 'Service Staff', desc: 'Fulfill guest requests' },
-              { icon: <DollarSign size={20} />, label: 'Finance', desc: 'Billing & payments' },
-              { icon: <BarChart3 size={20} />, label: 'Analytics', desc: 'Reports & KPIs' },
-            ].map((m, i) => (
-              <div key={i} className="group text-center p-5 rounded-2xl border border-white/8 hover:border-amber-400/30 bg-white/[0.03] hover:bg-white/[0.06] transition-all duration-300">
-                <div className="w-11 h-11 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center mx-auto mb-3 group-hover:bg-amber-400 group-hover:text-slate-950 transition-all duration-300">
-                  {m.icon}
-                </div>
-                <p className="text-white text-sm font-bold">{m.label}</p>
-                <p className="text-gray-500 text-xs mt-1">{m.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-10 flex items-center justify-center gap-2 text-amber-400/60">
-            {['Guest', 'Front Desk', 'Manager', 'Staff', 'Finance'].map((step, i) => (
-              <div key={step} className="flex items-center gap-2">
-                <span className="text-xs font-bold">{step}</span>
-                {i < 4 && <ArrowRight size={12} />}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* ── CTA Banner ─────────────────────────────────────────── */}
       <section className="mx-6 mb-20 rounded-3xl bg-gradient-to-r from-slate-900 to-slate-800 border border-amber-400/10 overflow-hidden relative">

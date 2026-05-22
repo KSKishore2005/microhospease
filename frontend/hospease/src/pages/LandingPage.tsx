@@ -148,10 +148,6 @@ export default function LandingPage() {
         ))}
 
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-6">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-400/15 border border-amber-400/30 rounded-full mb-6">
-            <Star size={12} className="text-amber-400" fill="currentColor" />
-            <span className="text-xs font-bold text-amber-300 uppercase tracking-widest">5-Star Luxury Hotel</span>
-          </div>
           {HERO_SLIDES.map((s, idx) => (
             <div key={idx} className={`absolute inset-0 flex flex-col items-center justify-center text-center px-6 transition-opacity duration-1000 ${idx === slide ? 'opacity-100' : 'opacity-0'}`}>
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-400/15 border border-amber-400/30 rounded-full mb-6">

@@ -54,7 +54,7 @@ export const useNotificationStore = create<NotificationState>()(
     }),
     {
       name: 'hospease-notifications',
-      partialize: (s) => ({ dismissedIds: s.dismissedIds }),
+      partialize: (s) => ({ notifications: s.notifications, dismissedIds: s.dismissedIds }),
     }
   )
 );

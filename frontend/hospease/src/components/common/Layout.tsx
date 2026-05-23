@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import ErrorBoundary from './ErrorBoundary';
 
 export default function Layout() {
   const { pathname } = useLocation();
@@ -35,7 +36,9 @@ export default function Layout() {
         </div>
         <Header />
         <main key={pathname} className="flex-1 overflow-y-auto p-4 sm:p-6 animate-fade-in-up">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

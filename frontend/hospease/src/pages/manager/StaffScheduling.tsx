@@ -6,6 +6,7 @@ import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { staffApi, shiftsApi } from '../../api/staff';
+import { usersApi } from '../../api/users';
 import type { ShiftEntity } from '../../api/staff';
 import { formatDate } from '../../utils/formatters';
 
@@ -50,7 +51,7 @@ function addDays(date: string, days: number): string {
 }
 
 export default function StaffScheduling() {
-  const [view, setView] = useState<'WEEK' | 'DEPT'>('WEEK');
+  const [view, setView] = useState<'WEEK' | 'DEPT' | 'DIRECTORY'>('WEEK');
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     staffId: '',
@@ -59,10 +60,24 @@ export default function StaffScheduling() {
   });
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Staff creation states
+  const [showAddStaff, setShowAddStaff] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [staffForm, setStaffForm] = useState({
+    name: '',
+    role: 'SERVICE_STAFF',
+    department: 'Service Staff',
+    phone: '',
+    email: '',
+    status: 'ACTIVE',
+  });
+  const [staffFormError, setStaffFormError] = useState<string | null>(null);
+
   const queryClient = useQueryClient();
 
   const { data: staff = [] } = useQuery({ queryKey: ['staff'], queryFn: staffApi.getAll });
   const { data: shifts = [] } = useQuery({ queryKey: ['shifts'], queryFn: shiftsApi.getAll });
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: usersApi.getAll });
 
   const createShiftMutation = useMutation({
     mutationFn: (payload: Parameters<typeof shiftsApi.create>[0]) => shiftsApi.create(payload),
@@ -75,6 +90,29 @@ export default function StaffScheduling() {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
         ?? 'Could not save shift. Please try again.';
       setFormError(msg);
+    },
+  });
+
+  const createStaffMutation = useMutation({
+    mutationFn: ({ payload, userId }: { payload: any; userId?: string }) =>
+      staffApi.create(payload, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['staff'] });
+      setShowAddStaff(false);
+      setStaffForm({
+        name: '',
+        role: 'SERVICE_STAFF',
+        department: 'Service Staff',
+        phone: '',
+        email: '',
+        status: 'ACTIVE',
+      });
+      setSelectedUserId('');
+      setStaffFormError(null);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Could not create staff member.';
+      setStaffFormError(msg);
     },
   });
 
@@ -126,6 +164,31 @@ export default function StaffScheduling() {
     });
   }
 
+  const handleUserSelect = (userId: string) => {
+    setSelectedUserId(userId);
+    const selectedUser = users.find((u) => String(u.userId) === String(userId));
+    if (selectedUser) {
+      let dept = 'Service Staff';
+      if (selectedUser.role === 'HOUSEKEEPING' || selectedUser.role === 'HOUSEKEEPING_STAFF') {
+        dept = 'Housekeeping';
+      } else if (selectedUser.role === 'FRONT_DESK' || selectedUser.role === 'FRONT_DESK_STAFF') {
+        dept = 'Front Desk';
+      } else if (selectedUser.role === 'FINANCE') {
+        dept = 'Finance';
+      } else if (selectedUser.role === 'MANAGER') {
+        dept = 'Management';
+      }
+      setStaffForm({
+        name: selectedUser.name || '',
+        role: selectedUser.role || 'SERVICE_STAFF',
+        department: dept,
+        phone: selectedUser.phone || '',
+        email: selectedUser.email || '',
+        status: 'ACTIVE',
+      });
+    }
+  };
+
   // Re-clear errors when shift type / date changes so the user sees fresh feedback
   useEffect(() => setFormError(null), [form.shiftType, form.shiftDate, form.staffId]);
 
@@ -138,16 +201,20 @@ export default function StaffScheduling() {
         </div>
         <div className="flex gap-2">
           <div className="flex p-1 bg-gray-100 rounded-xl gap-1">
-            {(['WEEK', 'DEPT'] as const).map((v) => (
+            {(['WEEK', 'DEPT', 'DIRECTORY'] as const).map((v) => (
               <button key={v} onClick={() => setView(v)}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${
                   view === v ? 'bg-white text-navy-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}>
-                {v === 'WEEK' ? <><CalendarDays size={14} /> Weekly View</> : <><Building2 size={14} /> By Dept</>}
+                {v === 'WEEK' ? <><CalendarDays size={14} /> Weekly View</> : v === 'DEPT' ? <><Building2 size={14} /> By Dept</> : <><Users size={14} /> Directory</>}
               </button>
             ))}
           </div>
-          <Button icon={<Plus size={16} />} onClick={() => openAddModal()}>Add Shift</Button>
+          {view === 'DIRECTORY' ? (
+            <Button icon={<Plus size={16} />} onClick={() => setShowAddStaff(true)}>Create Staff</Button>
+          ) : (
+            <Button icon={<Plus size={16} />} onClick={() => openAddModal()}>Add Shift</Button>
+          )}
         </div>
       </div>
 
@@ -170,7 +237,7 @@ export default function StaffScheduling() {
         ))}
       </div>
 
-      {view === 'WEEK' ? (
+      {view === 'WEEK' && (
         <Card padding={false}>
           <div className="px-6 py-4 border-b border-gray-50">
             <h3 className="font-semibold text-gray-900">7-Day Schedule</h3>
@@ -237,7 +304,9 @@ export default function StaffScheduling() {
             </table>
           </div>
         </Card>
-      ) : (
+      )}
+
+      {view === 'DEPT' && (
         <div className="grid lg:grid-cols-2 gap-6">
           {departments.map((dept) => {
             const deptStaff = staff.filter((s) => s.department === dept);
@@ -271,6 +340,67 @@ export default function StaffScheduling() {
         </div>
       )}
 
+      {view === 'DIRECTORY' && (
+        <Card padding={false}>
+          <div className="px-6 py-4 border-b border-gray-50">
+            <h3 className="font-semibold text-gray-900">Staff Directory</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Manage staff profiles and link to registered users</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Department</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Contact</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">User Link</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {staff.map((member) => (
+                  <tr key={member.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-navy-100 flex items-center justify-center text-navy-700 font-bold">
+                          {(member.name ?? 'S')[0].toUpperCase()}
+                        </div>
+                        <span className="font-semibold text-gray-900">{member.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-gray-600 font-medium">{member.department}</td>
+                    <td className="px-6 py-4 text-gray-600">{member.role?.replace(/_/g, ' ')}</td>
+                    <td className="px-6 py-4 text-xs text-gray-500">
+                      <div>{member.email || '—'}</div>
+                      <div className="mt-0.5">{member.phone || '—'}</div>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500">
+                      {member.userId ? (
+                        <span className="px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium">User #{member.userId}</span>
+                      ) : (
+                        <span className="text-gray-400 italic">Not Linked</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge variant={member.status === 'ACTIVE' ? 'success' : 'warning'} dot>
+                        {member.status ?? 'ACTIVE'}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+                {staff.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-10 text-sm text-gray-400">No staff members found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* Add Shift Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Shift"
         subtitle="Assign a shift to a staff member" size="md"
         footer={
@@ -350,6 +480,125 @@ export default function StaffScheduling() {
               {' · '}
               <span className="font-medium">{form.shiftType}</span> ({SHIFT_TIMES_LABEL[form.shiftType]})
             </p>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Create Staff Modal */}
+      <Modal open={showAddStaff} onClose={() => setShowAddStaff(false)} title="Create New Staff Profile" size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setShowAddStaff(false)}>Cancel</Button>
+            <Button
+              disabled={!staffForm.name || createStaffMutation.isPending}
+              loading={createStaffMutation.isPending}
+              onClick={() => {
+                createStaffMutation.mutate({
+                  payload: {
+                    name: staffForm.name,
+                    role: staffForm.role,
+                    department: staffForm.department,
+                    phone: staffForm.phone || undefined,
+                    email: staffForm.email || undefined,
+                    status: staffForm.status,
+                    hireDate: new Date().toISOString().split('T')[0],
+                  },
+                  userId: selectedUserId || undefined,
+                });
+              }}>
+              Create Profile
+            </Button>
+          </>
+        }>
+        <div className="space-y-4">
+          {staffFormError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 flex items-start gap-2">
+              <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
+              <span>{staffFormError}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="input-label">Link to Registered User (Optional)</label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => handleUserSelect(e.target.value)}
+              className="select">
+              <option value="">— Select User (Auto-fills Profile) —</option>
+              {users.map((u) => (
+                <option key={u.userId} value={u.userId}>
+                  {u.name} ({u.email} · {u.role})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="input-label">Full Name</label>
+            <input
+              type="text"
+              value={staffForm.name}
+              onChange={(e) => setStaffForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. John Doe"
+              className="input"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="input-label">Department</label>
+              <input
+                type="text"
+                value={staffForm.department}
+                onChange={(e) => setStaffForm((f) => ({ ...f, department: e.target.value }))}
+                placeholder="e.g. Housekeeping"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="input-label">Role</label>
+              <input
+                type="text"
+                value={staffForm.role}
+                onChange={(e) => setStaffForm((f) => ({ ...f, role: e.target.value }))}
+                placeholder="e.g. HOUSEKEEPING_STAFF"
+                className="input"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="input-label">Email</label>
+              <input
+                type="email"
+                value={staffForm.email}
+                onChange={(e) => setStaffForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="email@example.com"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="input-label">Phone</label>
+              <input
+                type="text"
+                value={staffForm.phone}
+                onChange={(e) => setStaffForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="+1 (555) 000-0000"
+                className="input"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="input-label">Status</label>
+            <select
+              value={staffForm.status}
+              onChange={(e) => setStaffForm((f) => ({ ...f, status: e.target.value }))}
+              className="select">
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
+            </select>
           </div>
         </div>
       </Modal>

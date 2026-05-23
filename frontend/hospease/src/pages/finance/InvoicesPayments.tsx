@@ -206,7 +206,7 @@ export default function InvoicesPayments() {
         open={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         title="Record Payment"
-        subtitle={`Invoice #${selectedInvoice?.invoiceId?.slice(0, 8)} | Guest ID: ${selectedInvoice?.guestId}`}
+        subtitle={`Invoice #${String(selectedInvoice?.invoiceId ?? '').slice(0, 8)} | Guest ID: ${selectedInvoice?.guestId}`}
         footer={
           <div className="flex gap-2 justify-end w-full">
             <Button variant="secondary" size="sm" onClick={() => setIsPaymentModalOpen(false)}>Cancel</Button>

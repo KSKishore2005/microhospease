@@ -59,9 +59,11 @@ export default function FBOrders() {
     queryFn: () => serviceOrdersApi.getByType('ROOM_SERVICE'),
   });
 
-  const allOrders = [...orders, ...roomServiceOrders].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const rawAllOrders = [...orders, ...roomServiceOrders];
+  const allOrders = (isServiceStaff
+    ? rawAllOrders.filter((o) => String(o.assignedToUserId) === String(user?.id))
+    : rawAllOrders
+  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Fetch reservations for picker
   const { data: allReservations = [] } = useQuery({

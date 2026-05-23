@@ -211,6 +211,9 @@ public class ServiceOrderService {
                     "Cannot assign an order in terminal status '" + existing.getStatus() + "'.");
         }
         existing.setAssignedToUserId(userId);
+        if (existing.getStatus() == ServiceOrderStatus.PENDING) {
+            existing.setStatus(ServiceOrderStatus.CONFIRMED);
+        }
         return enrich(repository.save(existing));
     }
 

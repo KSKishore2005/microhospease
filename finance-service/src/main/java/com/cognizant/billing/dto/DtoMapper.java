@@ -24,7 +24,9 @@ public final class DtoMapper {
                                                           BigDecimal amountPaid) {
         if (invoice == null) return null;
         BigDecimal paid = amountPaid != null ? amountPaid : BigDecimal.ZERO;
-        BigDecimal balance = invoice.getTotalAmount().subtract(paid);
+        BigDecimal balance = (invoice.getStatus() == InvoiceStatus.REFUNDED || invoice.getStatus() == InvoiceStatus.CANCELLED)
+                ? BigDecimal.ZERO
+                : invoice.getTotalAmount().subtract(paid);
         return InvoiceResponseDto.builder()
                 .invoiceId(invoice.getInvoiceId())
                 .guestId(invoice.getGuestId())

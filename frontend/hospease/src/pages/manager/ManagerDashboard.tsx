@@ -1,4 +1,4 @@
-import { Users, TrendingUp, Hotel, Clock, ArrowRight, BarChart3, Target, CheckCircle2, UserCheck } from 'lucide-react';
+import { Users, TrendingUp, Hotel, Clock, ArrowRight, BarChart3, Target, CheckCircle2, UserCheck, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,11 +8,11 @@ import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
 import { reservationsApi } from '../../api/reservations';
 import { roomsApi } from '../../api/rooms';
-import { staffApi } from '../../api/staff';
+import { staffApi, shiftsApi } from '../../api/staff';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import { usersApi } from '../../api/users';
 import { kpisApi } from '../../api/reporting';
-import { formatCurrency, formatPercent } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 import { useWorkflowStore } from '../../store/workflowStore';
 import { useToastStore } from '../../store/toastStore';
 
@@ -20,6 +20,7 @@ export default function ManagerDashboard() {
   const { data: reservations = [] } = useQuery({ queryKey: ['reservations'],    queryFn: reservationsApi.getAll });
   const { data: rooms = [] }        = useQuery({ queryKey: ['rooms'],            queryFn: roomsApi.getAll });
   const { data: staff = [] }        = useQuery({ queryKey: ['staff'],            queryFn: staffApi.getAll });
+  const { data: shifts = [] }       = useQuery({ queryKey: ['shifts'],           queryFn: shiftsApi.getAll });
   const { data: serviceOrders = [] }= useQuery({ queryKey: ['service-orders'],  queryFn: serviceOrdersApi.getAll });
   const { data: kpis = [] }         = useQuery({ queryKey: ['kpis'],            queryFn: kpisApi.getAll });
   const { data: allUsers = [] }     = useQuery({ queryKey: ['users'],           queryFn: usersApi.getAll });
@@ -38,7 +39,7 @@ export default function ManagerDashboard() {
     mutationFn: ({ orderId, userId }: { orderId: string; userId: string }) =>
       serviceOrdersApi.assign(orderId, userId),
     onSuccess: (_, { orderId, userId }) => {
-      const staffMember = allUsers.find((u) => u.userId === userId);
+      const staffMember = allUsers.find((u) => String(u.userId) === String(userId));
       setStatus(orderId, 'STAFF_ASSIGNED', { assignedUserId: userId, assignedUserName: staffMember?.name });
       queryClient.invalidateQueries({ queryKey: ['service-orders'] });
       addToast(`Task assigned to ${staffMember?.name ?? 'staff'}`, 'success');
@@ -50,7 +51,7 @@ export default function ManagerDashboard() {
     addToast('Task verified — Front Desk can now close it', 'success');
   };
 
-  const activeStaff   = staff.filter((s) => s.status === 'ACTIVE').length;
+  const activeStaffCount = staff.filter((s) => s.status === 'ACTIVE').length;
   const checkedIn     = reservations.filter((r) => r.status === 'CHECKED_IN').length;
   const totalRooms    = rooms.length;
   const occupancyRate = totalRooms > 0 ? Math.round((checkedIn / totalRooms) * 100) : 0;
@@ -67,13 +68,43 @@ export default function ManagerDashboard() {
     { label: 'Maintenance', count: rooms.filter((r) => r.status === 'MAINTENANCE').length, color: 'bg-rose-500'    },
   ];
 
-  // Orders in the workflow that need manager attention
-  const forwardedOrders = serviceOrders.filter((o) =>
-    customStatuses[o.orderId]?.status === 'FORWARDED_TO_MANAGER'
-  );
-  const completedByStaff = serviceOrders.filter((o) =>
-    customStatuses[o.orderId]?.status === 'STAFF_COMPLETED'
-  );
+  // Active requests (not completed or cancelled)
+  const activeRequests = serviceOrders.filter((o) => o.status !== 'COMPLETED' && o.status !== 'CANCELLED');
+
+  const getWorkflowStatusLabel = (orderId: string, dbStatus: string) => {
+    const wf = customStatuses[orderId];
+    if (!wf) {
+      if (dbStatus === 'PENDING') return 'Pending Front Desk';
+      return dbStatus.replace(/_/g, ' ');
+    }
+    if (wf.status === 'FORWARDED_TO_MANAGER') return 'Forwarded to Manager';
+    if (wf.status === 'STAFF_ASSIGNED') return `Assigned: ${wf.assignedUserName || 'Staff'}`;
+    if (wf.status === 'STAFF_COMPLETED') return 'Awaiting Verification';
+    if (wf.status === 'MANAGER_VERIFIED') return 'Verified (Awaiting Closure)';
+    return dbStatus.replace(/_/g, ' ');
+  };
+
+  const getWorkflowStatusBadge = (orderId: string, dbStatus: string) => {
+    const wf = customStatuses[orderId];
+    if (!wf) {
+      if (dbStatus === 'PENDING') return 'danger';
+      return 'info';
+    }
+    if (wf.status === 'FORWARDED_TO_MANAGER') return 'warning';
+    if (wf.status === 'STAFF_ASSIGNED') return 'info';
+    if (wf.status === 'STAFF_COMPLETED') return 'warning';
+    if (wf.status === 'MANAGER_VERIFIED') return 'success';
+    return 'info';
+  };
+
+  // Staff availability tracker today
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayShifts = shifts.filter((s) => s.startTime?.startsWith(todayStr));
+
+  const getStaffTodayShift = (staffId: string) => {
+    const shift = todayShifts.find((s) => String(s.staffId) === String(staffId));
+    return shift ? `On Shift: ${shift.shiftType || 'Scheduled'}` : 'Off Duty';
+  };
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -92,75 +123,130 @@ export default function ManagerDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
         <StatCard title="Occupancy Rate"    value={`${occupancyRate}%`} icon={<Hotel size={20} />}      color="navy"    className="animate-fade-in-up" />
         <StatCard title="Revenue KPI"       value={revenueKPI ? formatCurrency(revenueKPI.currentValue) : '—'} icon={<TrendingUp size={20} />} color="emerald" className="animate-fade-in-up" />
-        <StatCard title="Active Staff"      value={activeStaff} subtitle={`of ${staff.length} total`}  icon={<Users size={20} />}      color="blue"    className="animate-fade-in-up" />
-        <StatCard title="Needs Attention"   value={forwardedOrders.length + completedByStaff.length} subtitle="requests awaiting action" icon={<Clock size={20} />} color="amber" className="animate-fade-in-up" />
+        <StatCard title="Active Staff"      value={activeStaffCount} subtitle={`of ${staff.length} total`}  icon={<Users size={20} />}      color="blue"    className="animate-fade-in-up" />
+        <StatCard title="Active Requests"   value={activeRequests.length} subtitle="requests in progress" icon={<ClipboardList size={20} />} color="amber" className="animate-fade-in-up" />
       </div>
 
-      {/* ── Service Request Management ─────────────────────────── */}
-      {(forwardedOrders.length > 0 || completedByStaff.length > 0) && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Forwarded — needs staff assignment */}
-          <Card title="Assign to Staff" subtitle={`${forwardedOrders.length} forwarded from Front Desk`} icon={<UserCheck size={15} />}>
-            <div className="space-y-3">
-              {forwardedOrders.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-4">No requests to assign</p>
-              )}
-              {forwardedOrders.map((order) => (
-                <div key={order.orderId} className="p-3 rounded-xl border border-blue-100 bg-blue-50/40">
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <p className="text-sm font-semibold text-gray-900">{order.serviceType.replace(/_/g, ' ')}</p>
-                    <Badge variant={statusBadge(order.status)}>{order.status.replace('_', ' ')}</Badge>
-                  </div>
-                  {order.description && <p className="text-xs text-gray-500 mb-2 truncate">{order.description}</p>}
-                  <div className="flex gap-2 items-center flex-wrap">
-                    <select
-                      value={assignMap[order.orderId] ?? ''}
-                      onChange={(e) => setAssignMap((m) => ({ ...m, [order.orderId]: e.target.value }))}
-                      className="select text-xs flex-1 min-w-[140px]">
-                      <option value="">— Select Staff —</option>
-                      {serviceStaff.map((u) => (
-                        <option key={u.userId} value={u.userId}>{u.name}</option>
-                      ))}
-                    </select>
-                    <button
-                      disabled={!assignMap[order.orderId] || assignMutation.isPending}
-                      onClick={() => assignMutation.mutate({ orderId: order.orderId, userId: assignMap[order.orderId] })}
-                      className="px-3 py-1.5 text-xs font-semibold bg-navy-900 text-white rounded-lg hover:bg-navy-800 disabled:opacity-50 transition-colors">
-                      Assign
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+      {/* Unified Operational Coordination Dashboard */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Active Requests Table */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card title="Active Service Requests" subtitle="Monitor and coordinate active operations" icon={<ClipboardList size={16} />}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase">
+                    <th className="py-3 px-2">Request</th>
+                    <th className="py-3 px-2">Location</th>
+                    <th className="py-3 px-2">Workflow Status</th>
+                    <th className="py-3 px-2">Assignee</th>
+                    <th className="py-3 px-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {activeRequests.map((order) => {
+                    const statusLabel = getWorkflowStatusLabel(order.orderId, order.status);
+                    const statusBadgeVar = getWorkflowStatusBadge(order.orderId, order.status);
+                    const wf = customStatuses[order.orderId];
+                    const isStaffCompleted = wf?.status === 'STAFF_COMPLETED';
+                    const canAssign = !wf || wf.status === 'FORWARDED_TO_MANAGER' || wf.status === 'STAFF_ASSIGNED';
 
-          {/* Staff completed — needs verification */}
-          <Card title="Verify Completions" subtitle={`${completedByStaff.length} awaiting your verification`} icon={<CheckCircle2 size={15} />}>
-            <div className="space-y-3">
-              {completedByStaff.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-4">No completions to verify</p>
-              )}
-              {completedByStaff.map((order) => {
-                const wf = customStatuses[order.orderId];
-                return (
-                  <div key={order.orderId} className="p-3 rounded-xl border border-emerald-100 bg-emerald-50/40">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <p className="text-sm font-semibold text-gray-900">{order.serviceType.replace(/_/g, ' ')}</p>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">Staff Completed</span>
-                    </div>
-                    {wf?.assignedUserName && <p className="text-xs text-gray-500 mb-2">Completed by: {wf.assignedUserName}</p>}
-                    <button
-                      onClick={() => handleVerify(order.orderId)}
-                      className="px-3 py-1.5 text-xs font-semibold bg-emerald-700 text-white rounded-lg hover:bg-emerald-600 transition-colors">
-                      ✓ Verify & Send to Front Desk
-                    </button>
-                  </div>
-                );
-              })}
+                    return (
+                      <tr key={order.orderId} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="py-3.5 px-2">
+                          <div className="font-semibold text-gray-900">{order.serviceType.replace(/_/g, ' ')}</div>
+                          <div className="text-xs text-gray-400 truncate max-w-xs">{order.description || 'No description'}</div>
+                        </td>
+                        <td className="py-3.5 px-2 text-gray-600 font-medium">
+                          {order.roomId ? `Room ${order.roomId}` : 'Dine-in'}
+                        </td>
+                        <td className="py-3.5 px-2">
+                          <Badge variant={statusBadgeVar}>{statusLabel}</Badge>
+                        </td>
+                        <td className="py-3.5 px-2">
+                          {canAssign ? (
+                            <select
+                              value={assignMap[order.orderId] ?? ''}
+                              onChange={(e) => setAssignMap((m) => ({ ...m, [order.orderId]: e.target.value }))}
+                              className="select py-1 text-xs max-w-[150px]">
+                              <option value="">— Select Staff —</option>
+                              {serviceStaff.map((u) => (
+                                <option key={u.userId} value={u.userId}>{u.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-xs text-gray-500 font-medium">
+                              {wf?.assignedUserName || 'Service Staff'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-2 text-right">
+                          {canAssign && (
+                            <button
+                              disabled={!assignMap[order.orderId] || assignMutation.isPending}
+                              onClick={() => assignMutation.mutate({ orderId: order.orderId, userId: assignMap[order.orderId] })}
+                              className="px-2.5 py-1.5 text-xs font-semibold bg-navy-900 text-white rounded-lg hover:bg-navy-800 disabled:opacity-50 transition-colors">
+                              Assign
+                            </button>
+                          )}
+                          {isStaffCompleted && (
+                            <button
+                              onClick={() => handleVerify(order.orderId)}
+                              className="px-2.5 py-1.5 text-xs font-semibold bg-emerald-700 text-white rounded-lg hover:bg-emerald-600 transition-colors shadow-sm">
+                              Verify
+                            </button>
+                          )}
+                          {!canAssign && !isStaffCompleted && (
+                            <span className="text-xs text-gray-400 italic">In progress</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {activeRequests.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-sm text-gray-400">
+                        No active service requests at this time.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </Card>
         </div>
-      )}
+
+        {/* Staff Availability Tracker */}
+        <div>
+          <Card title="Staff Availability" subtitle="Live shift statuses today" icon={<Users size={16} />}>
+            <div className="space-y-3">
+              {staff.map((member) => {
+                const shiftStatus = getStaffTodayShift(member.id);
+                const isShiftActive = shiftStatus.startsWith('On Shift');
+                return (
+                  <div key={member.id} className="flex items-center justify-between p-2.5 rounded-xl border border-gray-50 bg-gray-50/20">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-navy-50 flex items-center justify-center font-bold text-navy-700 text-xs">
+                        {(member.name ?? 'S')[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 text-sm">{member.name}</div>
+                        <div className="text-xs text-gray-400">{member.department} · {member.role?.replace(/_/g, ' ')}</div>
+                      </div>
+                    </div>
+                    <Badge variant={isShiftActive ? 'success' : 'gray'} className="text-xs">
+                      {shiftStatus}
+                    </Badge>
+                  </div>
+                );
+              })}
+              {staff.length === 0 && (
+                <p className="text-center py-6 text-sm text-gray-400">No staff members found.</p>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
 
       {/* Occupancy meter */}
       <div className="bg-gradient-to-br from-navy-900 to-navy-800 rounded-2xl p-6 text-white">

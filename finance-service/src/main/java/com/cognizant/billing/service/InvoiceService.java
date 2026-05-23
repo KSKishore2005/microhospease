@@ -50,25 +50,25 @@ public class InvoiceService {
 
     // ─── Read ────────────────────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<InvoiceResponseDto> getAllInvoices() {
         return invoiceRepository.findAll().stream()
                 .map(this::enrich)
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public InvoiceResponseDto getInvoiceById(Long id) {
         return enrich(findEntityById(id));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<InvoiceResponseDto> getInvoicesByGuest(Long guestId) {
         return invoiceRepository.findByGuestId(guestId).stream()
                 .map(this::enrich).collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public InvoiceResponseDto getInvoiceByReservation(Long reservationId) {
         Invoice invoice = invoiceRepository.findByReservationId(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -76,7 +76,7 @@ public class InvoiceService {
         return enrich(invoice);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<InvoiceResponseDto> getInvoicesByStatus(InvoiceStatus status) {
         return invoiceRepository.findByStatus(status).stream()
                 .map(this::enrich).collect(Collectors.toList());
@@ -318,7 +318,64 @@ public class InvoiceService {
      * Builds invoice response with paid amount + enriched guest data.
      * Falls back gracefully when upstream services aren't reachable.
      */
+    private void recalculateInvoiceIfUnpaid(Invoice invoice) {
+        if (invoice.getStatus() == InvoiceStatus.PAID || invoice.getStatus() == InvoiceStatus.CANCELLED || invoice.getStatus() == InvoiceStatus.REFUNDED) {
+            return;
+        }
+
+        Long reservationId = invoice.getReservationId();
+        if (reservationId == null) {
+            return;
+        }
+
+        try {
+            ReservationDto reservation = guestReservationClient.getReservationById(reservationId);
+            if (reservation == null) return;
+            if (reservation.getCheckInDate() == null || reservation.getCheckOutDate() == null) return;
+            if (!reservation.getCheckOutDate().isAfter(reservation.getCheckInDate())) return;
+
+            BigDecimal ratePerNight = resolveRatePerNight(reservation);
+            if (ratePerNight == null || ratePerNight.signum() <= 0) return;
+
+            long nights = ChronoUnit.DAYS.between(reservation.getCheckInDate(), reservation.getCheckOutDate());
+            if (nights <= 0) nights = 1;
+            BigDecimal roomCharge = ratePerNight.multiply(BigDecimal.valueOf(nights));
+
+            List<ServiceOrderDto> orders;
+            try {
+                orders = serviceOrderClient.getOrdersByReservationId(reservationId);
+                if (orders == null) orders = List.of();
+            } catch (Exception e) {
+                log.warn("service-order-service unavailable during recalculation: {}", e.getMessage());
+                orders = List.of();
+            }
+
+            BigDecimal serviceCharges = orders.stream()
+                    .filter(o -> o.getStatus() == null
+                            || CHARGEABLE_ORDER_STATUSES.contains(o.getStatus().toUpperCase()))
+                    .map(ServiceOrderDto::getPrice)
+                    .filter(p -> p != null)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal total = roomCharge.add(serviceCharges);
+            String lineItemsJson = buildLineItemsJson(reservation, nights, ratePerNight, roomCharge, orders, serviceCharges, total);
+
+            invoice.setLineItemsJson(lineItemsJson);
+            invoice.setTotalAmount(total);
+
+            LocalDate checkOutDate = reservation.getCheckOutDate();
+            LocalDate dueDate = invoice.getDueDate();
+            LocalDate now = LocalDate.now();
+            if ((checkOutDate != null && now.isAfter(checkOutDate)) || (dueDate != null && now.isAfter(dueDate))) {
+                invoice.setStatus(InvoiceStatus.OVERDUE);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to recalculate invoice id={}: {}", invoice.getInvoiceId(), e.getMessage());
+        }
+    }
+
     InvoiceResponseDto enrich(Invoice invoice) {
+        recalculateInvoiceIfUnpaid(invoice);
         BigDecimal paid = paymentRepository.sumSuccessfulPaymentsForInvoice(invoice.getInvoiceId());
         GuestDto guest = null;
         try {

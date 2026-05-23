@@ -65,9 +65,11 @@ export default function SpaGymBookings() {
     queryKey: ['service-orders', 'GYM'],
     queryFn: () => serviceOrdersApi.getByType('GYM'),
   });
-  const bookings = [...spaOrders, ...gymOrders].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const rawBookings = [...spaOrders, ...gymOrders];
+  const bookings = (isServiceStaff
+    ? rawBookings.filter((b) => String(b.assignedToUserId) === String(user?.id))
+    : rawBookings
+  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const { data: allReservations = [] } = useQuery({
     queryKey: ['reservations'],

@@ -1,4 +1,4 @@
-import { ShoppingCart, Clock, CheckCircle2, Leaf, ArrowRight, WashingMachine } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle2, Leaf, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
@@ -6,16 +6,22 @@ import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import { formatRelative } from '../../utils/formatters';
+import { useAuthStore } from '../../store/authStore';
 
 export default function ServiceStaffDashboard() {
-  const { data: restaurantOrders = [] } = useQuery({
-    queryKey: ['service-orders', 'RESTAURANT'],
-    queryFn: () => serviceOrdersApi.getByType('RESTAURANT'),
+  const { user } = useAuthStore();
+  const userId = user?.id;
+
+  const { data: allOrders = [] } = useQuery({
+    queryKey: ['service-orders'],
+    queryFn: serviceOrdersApi.getAll,
   });
-  const { data: spaOrders = [] } = useQuery({
-    queryKey: ['service-orders', 'SPA'],
-    queryFn: () => serviceOrdersApi.getByType('SPA'),
-  });
+
+  // Filter to show only tasks assigned to this service staff member
+  const myOrders = allOrders.filter((o) => String(o.assignedToUserId) === String(userId));
+
+  const restaurantOrders = myOrders.filter((o) => o.serviceType === 'RESTAURANT' || o.serviceType === 'ROOM_SERVICE');
+  const spaOrders = myOrders.filter((o) => o.serviceType === 'SPA' || o.serviceType === 'GYM');
 
   const orders      = restaurantOrders;
   const pending     = orders.filter((o) => o.status === 'PENDING').length;

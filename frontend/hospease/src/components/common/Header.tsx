@@ -2,6 +2,7 @@ import { Bell, Search, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore, type AppNotification } from '../../store/notificationStore';
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import { reservationsApi } from '../../api/reservations';
 import { housekeepingApi } from '../../api/housekeeping';
@@ -57,12 +58,35 @@ export default function Header() {
   const { user } = useAuthStore();
   const { addNotification, markOneRead, markAllRead, getUnread } = useNotificationStore();
   const [notifOpen, setNotifOpen] = useState(false);
+  const navigate = useNavigate();
   const panelRef = useRef<HTMLDivElement>(null);
 
   const info = roleInfo[user?.role ?? ''] ?? { label: user?.role ?? '', color: 'text-gray-600', bg: 'bg-gray-100' };
   const gradient = roleGradients[user?.role ?? ''] ?? 'from-navy-500 to-navy-700';
   const initials = user?.name?.trim().split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() ?? 'U';
   const unread = getUnread();
+
+  const handleNotifClick = (n: AppNotification) => {
+    markOneRead(n.id);
+    setNotifOpen(false);
+
+    if (user) {
+      if (n.type === 'booking') {
+        if (user.role === 'GUEST') navigate('/guest/reservations');
+        else if (user.role === 'FRONT_DESK' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/frontdesk/reservations');
+      } else if (n.type === 'service') {
+        if (user.role === 'GUEST') navigate('/guest/service-requests');
+        else if (user.role === 'FRONT_DESK' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/frontdesk/communications');
+      } else if (n.type === 'payment') {
+        if (user.role === 'GUEST') navigate('/guest/invoices');
+        else if (user.role === 'FINANCE' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/finance/invoices');
+      } else if (n.type === 'task') {
+        if (user.role === 'SERVICE_STAFF') navigate('/servicestaff/fulfillment');
+      } else if (n.type === 'housekeeping') {
+        if (user.role === 'HOUSEKEEPING' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/housekeeping/tasks');
+      }
+    }
+  };
 
   // ── Polling ──────────────────────────────────────────
   useEffect(() => {
@@ -188,7 +212,7 @@ export default function Header() {
                     <p className="text-[10px] text-gray-300 mt-0.5">You're all caught up!</p>
                   </div>
                 ) : unread.slice(0, 10).map((n: AppNotification) => (
-                  <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50/80 transition-colors group">
+                  <div key={n.id} onClick={() => handleNotifClick(n)} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50/80 transition-colors group cursor-pointer">
                     <span className="text-base mt-0.5 flex-shrink-0">{notifTypeIcons[n.type ?? 'system'] ?? '🔔'}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-800 leading-tight">{n.title}</p>

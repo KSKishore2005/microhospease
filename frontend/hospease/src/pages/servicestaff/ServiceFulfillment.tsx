@@ -81,9 +81,13 @@ export default function ServiceFulfillment() {
         {COLUMNS.map(({ status, label, headerColor, cardBorder, emptyIcon }) => {
           // Items explicitly assigned to me that match DB status
           const colItems = mine.filter((r) => {
+            const isStaffCompleted = getStatus(r.orderId)?.status === 'STAFF_COMPLETED';
             // STAFF_COMPLETED items remain in IN_PROGRESS on DB but show in Completed col
             if (status === 'COMPLETED') {
-              return r.status === 'COMPLETED' || getStatus(r.orderId)?.status === 'STAFF_COMPLETED';
+              return r.status === 'COMPLETED' || isStaffCompleted;
+            }
+            if (status === 'IN_PROGRESS') {
+              return r.status === 'IN_PROGRESS' && !isStaffCompleted;
             }
             return r.status === status;
           });

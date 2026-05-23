@@ -1,4 +1,0 @@
-INSERT INTO rooms (number, type, capacity, amenities_json, status, rate_per_night, created_at) VALUES
-                                                                                                   ('101', 'SINGLE', 1, '{"bed":"Queen","wifi":true,"tv":true,"view":"city"}', 'AVAILABLE', 120.00, CURRENT_TIMESTAMP),
-                                                                                                   ('202', 'DOUBLE', 2, '{"bed":"Two Doubles","wifi":true,"miniBar":true,"balcony":true}', 'AVAILABLE', 180.00, CURRENT_TIMESTAMP),
-                                                                                                   ('303', 'SUITE', 4, '{"bed":"King","wifi":true,"livingArea":true,"jacuzzi":true}', 'MAINTENANCE', 320.00, CURRENT_TIMESTAMP);

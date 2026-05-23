@@ -7,7 +7,7 @@ import Badge from '../../components/common/Badge';
 import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
-import { invoicesApi } from '../../api/invoices';
+import { invoicesApi, parseLineItems } from '../../api/invoices';
 import { paymentsApi } from '../../api/payments';
 import type { PaymentMethod } from '../../api/payments';
 import { formatDate, formatCurrency } from '../../utils/formatters';
@@ -231,6 +231,34 @@ export default function InvoicesPayments() {
         }
       >
         <div className="space-y-4">
+          {selectedInvoice && parseLineItems(selectedInvoice.lineItemsJson).length > 0 && (
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Invoice Line Items</label>
+              <div className="rounded-xl border border-gray-100 overflow-hidden bg-gray-50/50">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-100 text-[10px] text-gray-500 font-semibold animate-none">
+                      <th className="px-3 py-2 text-left">Description</th>
+                      <th className="px-3 py-2 text-right">Qty</th>
+                      <th className="px-3 py-2 text-right">Price</th>
+                      <th className="px-3 py-2 text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {parseLineItems(selectedInvoice.lineItemsJson).map((item, idx) => (
+                      <tr key={idx} className="hover:bg-gray-100/30 transition-colors">
+                        <td className="px-3 py-2 text-gray-700 font-medium">{item.description}</td>
+                        <td className="px-3 py-2 text-right text-gray-500">{item.quantity}</td>
+                        <td className="px-3 py-2 text-right text-gray-500">{formatCurrency(item.unitPrice)}</td>
+                        <td className="px-3 py-2 text-right font-bold text-gray-800">{formatCurrency(item.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase">Outstanding Balance</label>
             <p className="text-xl font-bold text-rose-600 mt-1">{formatCurrency(Number(selectedInvoice?.balanceDue ?? 0))}</p>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { CheckCircle, Play, SkipForward, ClipboardList, Loader2, Clock, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Badge from '../../components/common/Badge';
@@ -6,7 +6,9 @@ import { statusBadge } from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';
+import { usersApi } from '../../api/users';
 import { useAuthStore } from '../../store/authStore';
+import { useRoomStatusStore } from '../../store/roomStatusStore';
 import { formatRelative } from '../../utils/formatters';
 
 type StatusFilter = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
@@ -28,11 +30,24 @@ export default function TaskList() {
   const [filter, setFilter] = useState<StatusFilter>('ALL');
 
   const queryClient = useQueryClient();
+  const { setFlag } = useRoomStatusStore();
 
   const { data: allTasks = [], isLoading } = useQuery({
     queryKey: ['housekeeping'],
     queryFn: housekeepingApi.getAll,
   });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.getAll,
+  });
+
+  const userMap = useMemo(() => new Map(users.map((u) => [String(u.userId), u.name])), [users]);
+
+  const housekeepingStaff = useMemo(
+    () => users.filter((u) => u.role === 'HOUSEKEEPING_STAFF' || u.role === 'HOUSEKEEPING'),
+    [users]
+  );
 
   const { data: rooms = [] } = useQuery({
     queryKey: ['rooms'],
@@ -47,9 +62,12 @@ export default function TaskList() {
   });
 
   // First filter by scope (mine vs all), then by status.
-  const scoped = scope === 'MINE' && userId
+  // STRICT FILTERING: Housekeeping role can ONLY see their assigned tasks.
+  const scoped = user?.role === 'HOUSEKEEPING'
     ? allTasks.filter((t) => String(t.assignedToUserId) === String(userId))
-    : allTasks;
+    : (scope === 'MINE' && userId
+        ? allTasks.filter((t) => String(t.assignedToUserId) === String(userId))
+        : allTasks);
 
   const filtered = scoped.filter((t) => filter === 'ALL' || t.status === filter);
 
@@ -143,12 +161,10 @@ export default function TaskList() {
           <div className="text-center py-16">
             <ClipboardList size={36} className="text-gray-200 mx-auto mb-3" />
             <p className="text-sm font-semibold text-gray-400">
-              {scope === 'MINE'
-                ? 'No tasks assigned to you'
-                : 'No tasks found'}
+              No assigned housekeeping tasks
             </p>
             <p className="text-xs text-gray-300 mt-1">
-              {scope === 'MINE'
+              {scope === 'MINE' || !isManagerView
                 ? 'Your manager will assign tasks here when they create them.'
                 : (filter !== 'ALL' ? `No ${filter.replace('_', ' ').toLowerCase()} tasks` : 'All tasks are complete!')}
             </p>
@@ -172,14 +188,37 @@ export default function TaskList() {
                       <p className="font-semibold text-gray-900">Room {roomNumberMap[task.roomId] ?? task.roomId}</p>
                       <Badge variant={statusBadge(task.status)} dot>{task.status.replace('_', ' ')}</Badge>
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {task.assignedToUserId
-                        ? (String(task.assignedToUserId) === String(userId)
-                            ? `Assigned to you`
-                            : `Assigned to user #${task.assignedToUserId}`)
-                        : 'Unassigned'}
-                      {task.scheduledAt && ` · Scheduled: ${formatRelative(task.scheduledAt)}`}
-                    </p>
+                    {isManagerView ? (
+                      <div className="flex items-center gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-xs text-gray-400">Assigned to:</span>
+                        <select
+                          value={task.assignedToUserId ?? ''}
+                          className="select py-0.5 px-1.5 text-xs bg-white border-gray-200"
+                          onChange={async (e) => {
+                            const newStaffId = e.target.value;
+                            await housekeepingApi.update(task.taskId, { assignedToUserId: newStaffId || undefined });
+                            queryClient.invalidateQueries({ queryKey: ['housekeeping'] });
+                          }}
+                        >
+                          <option value="">Unassigned</option>
+                          {housekeepingStaff.map((staff) => (
+                            <option key={staff.userId} value={staff.userId}>
+                              {staff.name}
+                            </option>
+                          ))}
+                        </select>
+                        {task.scheduledAt && <span className="text-xs text-gray-400">· Scheduled: {formatRelative(task.scheduledAt)}</span>}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {task.assignedToUserId
+                          ? (String(task.assignedToUserId) === String(userId)
+                              ? `Assigned to you`
+                              : `Assigned to ${userMap.get(String(task.assignedToUserId)) || `User #${task.assignedToUserId}`}`)
+                          : 'Unassigned'}
+                        {task.scheduledAt && ` · Scheduled: ${formatRelative(task.scheduledAt)}`}
+                      </p>
+                    )}
                     {task.completedAt && (
                       <p className="text-xs text-emerald-600 mt-0.5">✓ Completed {formatRelative(task.completedAt)}</p>
                     )}
@@ -196,7 +235,10 @@ export default function TaskList() {
                   {task.status === 'IN_PROGRESS' && (
                     <>
                       <Button size="sm" variant="primary" icon={<CheckCircle size={13} />}
-                        onClick={() => updateStatusMutation.mutate({ id: task.taskId, status: 'COMPLETED' })}>
+                        onClick={() => {
+                          updateStatusMutation.mutate({ id: task.taskId, status: 'COMPLETED' });
+                          setFlag(String(task.roomId), 'CLEAN');
+                        }}>
                         Done
                       </Button>
                       <Button size="sm" variant="ghost" icon={<SkipForward size={13} />}

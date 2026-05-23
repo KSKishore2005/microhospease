@@ -240,9 +240,10 @@ public class InvoiceService {
 
     public InvoiceResponseDto markAsOverdue(Long id) {
         Invoice invoice = findEntityById(id);
-        // PAID or CANCELLED invoices can't go OVERDUE; OVERDUE itself is idempotent.
+        // PAID, CANCELLED or REFUNDED invoices can't go OVERDUE; OVERDUE itself is idempotent.
         if (invoice.getStatus() == InvoiceStatus.PAID
-                || invoice.getStatus() == InvoiceStatus.CANCELLED) {
+                || invoice.getStatus() == InvoiceStatus.CANCELLED
+                || invoice.getStatus() == InvoiceStatus.REFUNDED) {
             throw new BadRequestException(
                     "Cannot mark a " + invoice.getStatus() + " invoice as OVERDUE.");
         }
@@ -360,14 +361,29 @@ public class InvoiceService {
             BigDecimal total = roomCharge.add(serviceCharges);
             String lineItemsJson = buildLineItemsJson(reservation, nights, ratePerNight, roomCharge, orders, serviceCharges, total);
 
-            invoice.setLineItemsJson(lineItemsJson);
-            invoice.setTotalAmount(total);
+            boolean changed = false;
+            if (invoice.getTotalAmount() == null || invoice.getTotalAmount().compareTo(total) != 0) {
+                invoice.setTotalAmount(total);
+                changed = true;
+            }
+            if (!lineItemsJson.equals(invoice.getLineItemsJson())) {
+                invoice.setLineItemsJson(lineItemsJson);
+                changed = true;
+            }
 
             LocalDate checkOutDate = reservation.getCheckOutDate();
             LocalDate dueDate = invoice.getDueDate();
             LocalDate now = LocalDate.now();
             if ((checkOutDate != null && now.isAfter(checkOutDate)) || (dueDate != null && now.isAfter(dueDate))) {
-                invoice.setStatus(InvoiceStatus.OVERDUE);
+                if (invoice.getStatus() != InvoiceStatus.OVERDUE) {
+                    invoice.setStatus(InvoiceStatus.OVERDUE);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                invoiceRepository.saveAndFlush(invoice);
+                log.info("Persisted recalculated invoice id={} total={}", invoice.getInvoiceId(), total);
             }
         } catch (Exception e) {
             log.warn("Failed to recalculate invoice id={}: {}", invoice.getInvoiceId(), e.getMessage());

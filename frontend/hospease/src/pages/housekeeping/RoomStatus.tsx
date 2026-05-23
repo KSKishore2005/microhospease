@@ -4,6 +4,9 @@ import { BedDouble, Wrench, Sparkles, Users } from 'lucide-react';
 import Badge from '../../components/common/Badge';
 import { statusBadge } from '../../components/common/Badge';
 import { roomsApi } from '../../api/rooms';
+import { usersApi } from '../../api/users';
+import { housekeepingApi } from '../../api/housekeeping';
+import { useAuthStore } from '../../store/authStore';
 import { useRoomStatusStore, type RoomFlag } from '../../store/roomStatusStore';
 import { cn } from '../../utils/cn';
 
@@ -26,6 +29,19 @@ export default function RoomStatus() {
   const { roomFlags, setFlag, clearFlag, getFlag } = useRoomStatusStore();
 
   const { data: rooms = [] } = useQuery({ queryKey: ['rooms'], queryFn: roomsApi.getAll });
+
+  const { user: currentUser } = useAuthStore();
+  const isManager = currentUser?.role === 'MANAGER' || currentUser?.role === 'ADMIN';
+
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: usersApi.getAll,
+    enabled: isManager,
+  });
+
+  const housekeepingStaff = allUsers.filter(
+    (u) => (u.role === 'HOUSEKEEPING_STAFF' || u.role === 'HOUSEKEEPING') && u.status === 'ACTIVE'
+  );
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => roomsApi.updateStatus(id, status),
@@ -159,6 +175,42 @@ export default function RoomStatus() {
                       </button>
                     );
                   })}
+                </div>
+              )}
+
+              {isManager && (room.displayStatus === 'DIRTY' || room.displayStatus === 'CLEANING') && (
+                <div className="mt-2.5 pt-2.5 border-t border-dashed border-gray-200/60">
+                  <p className="text-[11px] font-semibold text-gray-500 mb-1">Assign Housekeeper:</p>
+                  <select
+                    className="select py-1 px-1.5 text-[11px] w-full bg-white border-gray-200"
+                    defaultValue=""
+                    onChange={async (e) => {
+                      const staffId = e.target.value;
+                      if (!staffId) return;
+                      try {
+                        await housekeepingApi.create({
+                          roomId: String(room.roomId),
+                          assignedToUserId: staffId,
+                          scheduledAt: new Date().toISOString()
+                        });
+                        if (room.status !== 'CLEANING') {
+                          await transition(String(room.roomId), 'CLEANING');
+                        }
+                        queryClient.invalidateQueries({ queryKey: ['housekeeping'] });
+                        queryClient.invalidateQueries({ queryKey: ['rooms'] });
+                        e.target.value = '';
+                      } catch (err) {
+                        console.error("Failed to assign housekeeping task", err);
+                      }
+                    }}
+                  >
+                    <option value="">— Select Staff —</option>
+                    {housekeepingStaff.map((staff) => (
+                      <option key={staff.userId} value={staff.userId}>
+                        {staff.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>

@@ -1,6 +1,6 @@
 import apiClient from './client';
 
-export type InvoiceStatus = 'UNPAID' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+export type InvoiceStatus = 'UNPAID' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'REFUNDED';
 
 export interface InvoiceResponseDto {
   invoiceId: string;
@@ -47,9 +47,9 @@ export function parseLineItems(json: string): LineItem[] {
         const rc = parsed.roomCharge;
         items.push({
           description: rc.description ?? 'Room Charge',
-          quantity: rc.quantity ?? 1,
+          quantity: rc.quantity ?? rc.nights ?? 1,
           unitPrice: rc.unitPrice ?? rc.ratePerNight ?? 0,
-          total: rc.total ?? rc.amount ?? 0,
+          total: rc.total ?? rc.amount ?? rc.subtotal ?? 0,
         });
       }
       if (Array.isArray(parsed.serviceOrders)) {

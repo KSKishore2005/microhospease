@@ -6,14 +6,28 @@ import Card from '../../components/common/Card';
 import Badge, { statusBadge } from '../../components/common/Badge';
 import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';
+import { usersApi } from '../../api/users';
+import { useAuthStore } from '../../store/authStore';
 import { formatRelative } from '../../utils/formatters';
 import { useMemo } from 'react';
 import { useRoomStatusStore } from '../../store/roomStatusStore';
 
 export default function HousekeepingDashboard() {
-  const { data: tasks = [] }  = useQuery({ queryKey: ['housekeeping'],              queryFn: housekeepingApi.getAll });
+  const { user } = useAuthStore();
+  const { data: allTasks = [] } = useQuery({ queryKey: ['housekeeping'], queryFn: housekeepingApi.getAll });
   const { data: rooms = [] }  = useQuery({ queryKey: ['rooms'],                     queryFn: roomsApi.getAll });
+  const { data: users = [] }  = useQuery({ queryKey: ['users'],                     queryFn: usersApi.getAll });
   const { roomFlags } = useRoomStatusStore();
+
+  const userMap = useMemo(() => new Map(users.map((u) => [String(u.userId), u.name])), [users]);
+
+  // Strict role-based filtering
+  const tasks = useMemo(() => {
+    if (user?.role === 'HOUSEKEEPING') {
+      return allTasks.filter((t) => String(t.assignedToUserId) === String(user.id));
+    }
+    return allTasks;
+  }, [allTasks, user]);
 
   const roomMap = useMemo(
     () => Object.fromEntries(rooms.map((r) => [r.roomId, r.number])),
@@ -138,27 +152,43 @@ export default function HousekeepingDashboard() {
         {/* Tasks */}
         <Card title="Today's Tasks" icon={<ClipboardList size={16} />}
           action={<Link to="/housekeeping/tasks" className="text-xs font-semibold text-navy-700 hover:underline flex items-center gap-1">View All <ArrowRight size={11} /></Link>}>
-          <div className="space-y-2">
-            {tasks.slice(0, 7).map((t) => (
-              <div key={t.taskId} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition-colors">
-                <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
-                  t.status === 'COMPLETED' ? 'bg-emerald-500' :
-                  t.status === 'IN_PROGRESS' ? 'bg-amber-400' : 'bg-gray-300'
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">Room {roomMap[t.roomId] ?? t.roomId}</p>
-                  <p className="text-xs text-gray-400">
-                    Assigned: {t.assignedToUserId ?? 'Unassigned'}
-                    {t.scheduledAt && ` · ${formatRelative(t.scheduledAt)}`}
-                  </p>
+          <div className="space-y-3">
+            {tasks.slice(0, 7).map((t) => {
+              const staffName = t.assignedToUserId ? (userMap.get(String(t.assignedToUserId)) || `User #${t.assignedToUserId}`) : 'Unassigned';
+              const isCompleted = t.status === 'COMPLETED';
+              return (
+                <div key={t.taskId} className="flex flex-col gap-1 p-3.5 rounded-xl border border-gray-100 bg-gray-50/30 hover:bg-gray-50 transition-colors animate-fade-in-up">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-gray-900">Room {roomMap[t.roomId] ?? t.roomId}</p>
+                    <Badge variant={statusBadge(t.status)} dot>{t.status.replace('_', ' ')}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 mt-1.5 text-xs text-gray-500">
+                    <div>
+                      <span className="font-medium text-gray-400">Cleaning Status: </span>
+                      <span className={isCompleted ? 'text-emerald-600 font-semibold' : 'text-amber-600 font-semibold'}>
+                        {isCompleted ? 'Clean' : 'Cleaning Required'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-400">Task Type: </span>
+                      <span className="text-navy-900 font-medium">Room Cleaning</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-400">Assigned Staff: </span>
+                      <span className="text-navy-900 font-semibold">{staffName}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-400">Timestamp: </span>
+                      <span className="text-gray-950 font-medium">{t.scheduledAt ? formatRelative(t.scheduledAt) : '—'}</span>
+                    </div>
+                  </div>
                 </div>
-                <Badge variant={statusBadge(t.status)} dot>{t.status.replace('_', ' ')}</Badge>
-              </div>
-            ))}
+              );
+            })}
             {tasks.length === 0 && (
               <div className="text-center py-10">
-                <Sparkles size={28} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">All tasks complete!</p>
+                <Sparkles size={28} className="text-gray-200 mx-auto mb-2 animate-pulse" />
+                <p className="text-sm text-gray-400 font-semibold">No assigned housekeeping tasks</p>
               </div>
             )}
           </div>

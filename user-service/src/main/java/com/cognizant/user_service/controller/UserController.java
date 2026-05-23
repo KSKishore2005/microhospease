@@ -43,19 +43,19 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR','AUDITOR')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR','AUDITOR','MANAGER')")
     public ResponseEntity<UserResponseDTO> getUserById(@PathVariable Long id) {
         return ResponseEntity.ok(mapToResponseDTO(userService.getUserById(id)));
     }
 
     @GetMapping("/email/{email}")
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR','AUDITOR')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR','AUDITOR','MANAGER')")
     public ResponseEntity<UserResponseDTO> getUserByEmail(@PathVariable String email) {
         return ResponseEntity.ok(mapToResponseDTO(userService.getUserByEmail(email)));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR','AUDITOR')")
+    @PreAuthorize("hasAnyAuthority('ADMINISTRATOR','AUDITOR','MANAGER')")
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
         List<User> users = userService.getAllUsers();
         List<UserResponseDTO> responseDTOs = users.stream().map(this::mapToResponseDTO).collect(Collectors.toList());

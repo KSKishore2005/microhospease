@@ -32,7 +32,12 @@ export default function ManagerDashboard() {
   const [assignMap, setAssignMap] = useState<Record<string, string>>({});
 
   const serviceStaff = allUsers.filter(
-    (u) => (u.role === 'RESTAURANT_SERVICE_STAFF' || u.role === 'SERVICE_STAFF') && u.status === 'ACTIVE'
+    (u) =>
+      (u.role === 'RESTAURANT_SERVICE_STAFF' ||
+       u.role === 'SERVICE_STAFF' ||
+       u.role === 'HOUSEKEEPING_STAFF' ||
+       u.role === 'HOUSEKEEPING') &&
+      u.status === 'ACTIVE'
   );
 
   const assignMutation = useMutation({
@@ -79,6 +84,8 @@ export default function ManagerDashboard() {
     }
     if (wf.status === 'FORWARDED_TO_MANAGER') return 'Forwarded to Manager';
     if (wf.status === 'STAFF_ASSIGNED') return `Assigned: ${wf.assignedUserName || 'Staff'}`;
+    if (wf.status === 'ACCEPTED') return 'Accepted';
+    if (wf.status === 'IN_PROGRESS') return 'In Progress';
     if (wf.status === 'STAFF_COMPLETED') return 'Awaiting Verification';
     if (wf.status === 'MANAGER_VERIFIED') return 'Verified (Awaiting Closure)';
     return dbStatus.replace(/_/g, ' ');
@@ -92,6 +99,8 @@ export default function ManagerDashboard() {
     }
     if (wf.status === 'FORWARDED_TO_MANAGER') return 'warning';
     if (wf.status === 'STAFF_ASSIGNED') return 'info';
+    if (wf.status === 'ACCEPTED') return 'info';
+    if (wf.status === 'IN_PROGRESS') return 'warning';
     if (wf.status === 'STAFF_COMPLETED') return 'warning';
     if (wf.status === 'MANAGER_VERIFIED') return 'success';
     return 'info';
@@ -149,7 +158,13 @@ export default function ManagerDashboard() {
                     const statusBadgeVar = getWorkflowStatusBadge(order.orderId, order.status);
                     const wf = customStatuses[order.orderId];
                     const isStaffCompleted = wf?.status === 'STAFF_COMPLETED';
-                    const canAssign = !wf || wf.status === 'FORWARDED_TO_MANAGER' || wf.status === 'STAFF_ASSIGNED';
+                    
+                    const assignedUserId = order.assignedToUserId || wf?.assignedUserId;
+                    const isAssigned = !!assignedUserId;
+                    const assignedUser = allUsers.find((u) => String(u.userId) === String(assignedUserId));
+                    const assignedName = assignedUser?.name || wf?.assignedUserName || 'Assigned';
+                    
+                    const canAssign = !isAssigned && (!wf || wf.status === 'FORWARDED_TO_MANAGER');
 
                     return (
                       <tr key={order.orderId} className="hover:bg-gray-50/50 transition-colors">
@@ -170,13 +185,18 @@ export default function ManagerDashboard() {
                               onChange={(e) => setAssignMap((m) => ({ ...m, [order.orderId]: e.target.value }))}
                               className="select py-1 text-xs max-w-[150px]">
                               <option value="">— Select Staff —</option>
-                              {serviceStaff.map((u) => (
-                                <option key={u.userId} value={u.userId}>{u.name}</option>
-                              ))}
+                              {serviceStaff.map((u) => {
+                                const roleLabel = u.role.replace(/_STAFF/g, '').replace(/RESTAURANT_/g, '');
+                                return (
+                                  <option key={u.userId} value={u.userId}>
+                                    {u.name} ({roleLabel})
+                                  </option>
+                                );
+                              })}
                             </select>
                           ) : (
-                            <span className="text-xs text-gray-500 font-medium">
-                              {wf?.assignedUserName || 'Service Staff'}
+                            <span className="text-xs text-gray-800 font-semibold bg-navy-50/50 px-2 py-1 rounded-lg border border-navy-100/50 inline-block">
+                              {assignedName}
                             </span>
                           )}
                         </td>
@@ -197,7 +217,9 @@ export default function ManagerDashboard() {
                             </button>
                           )}
                           {!canAssign && !isStaffCompleted && (
-                            <span className="text-xs text-gray-400 italic">In progress</span>
+                            <span className="text-xs text-gray-400 italic">
+                              {order.status === 'IN_PROGRESS' ? 'In progress' : 'Assigned'}
+                            </span>
                           )}
                         </td>
                       </tr>

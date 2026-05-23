@@ -67,7 +67,7 @@ export default function SpaGymBookings() {
   });
   const rawBookings = [...spaOrders, ...gymOrders];
   const bookings = (isServiceStaff
-    ? rawBookings.filter((b) => String(b.assignedToUserId) === String(user?.id))
+    ? rawBookings.filter((b) => String(b.assignedToUserId) === String(user?.id || (user as any)?.userId))
     : rawBookings
   ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

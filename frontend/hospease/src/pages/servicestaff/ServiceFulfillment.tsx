@@ -24,10 +24,10 @@ export default function ServiceFulfillment() {
   const queryClient = useQueryClient();
   const { customStatuses, setStatus, getStatus } = useWorkflowStore();
   const addToast = useToastStore((s) => s.addToast);
-  const userId = user?.id;
+  const userId = user?.id || (user as any)?.userId;
 
   // My assigned orders
-  const { data: myOrders = [] } = useQuery({
+  const { data: myOrders = [], isPending: isOrdersLoading } = useQuery({
     queryKey: ['service-orders', 'assignee', userId],
     queryFn: () => serviceOrdersApi.getByAssignee(userId!),
     enabled: !!userId,
@@ -35,7 +35,8 @@ export default function ServiceFulfillment() {
 
   const acceptMutation = useMutation({
     mutationFn: (id: string) => serviceOrdersApi.accept(id, userId!),
-    onSuccess: () => {
+    onSuccess: (data, id) => {
+      setStatus(id, 'IN_PROGRESS', { assignedUserId: userId, assignedUserName: user?.name });
       queryClient.invalidateQueries({ queryKey: ['service-orders', 'assignee', userId] });
       addToast('Task started — marked as In Progress', 'success');
     },
@@ -51,7 +52,22 @@ export default function ServiceFulfillment() {
   ];
 
   if (!userId) {
-    return <div className="text-center py-16 text-sm text-gray-400">Loading your profile…</div>;
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Loader2 className="w-8 h-8 text-navy-500 animate-spin mb-3" />
+        <p className="text-sm text-gray-500 font-medium">Loading your profile…</p>
+        <p className="text-xs text-gray-400 mt-1">If this takes too long, try logging in again.</p>
+      </div>
+    );
+  }
+
+  if (isOrdersLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Loader2 className="w-8 h-8 text-navy-500 animate-spin mb-3" />
+        <p className="text-sm text-gray-500 font-medium">Loading assigned tasks…</p>
+      </div>
+    );
   }
 
   return (

@@ -10,7 +10,7 @@ import { useAuthStore } from '../../store/authStore';
 
 export default function ServiceStaffDashboard() {
   const { user } = useAuthStore();
-  const userId = user?.id;
+  const userId = user?.id || (user as any)?.userId;
 
   const { data: allOrders = [] } = useQuery({
     queryKey: ['service-orders'],

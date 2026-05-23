@@ -61,7 +61,7 @@ export default function FBOrders() {
 
   const rawAllOrders = [...orders, ...roomServiceOrders];
   const allOrders = (isServiceStaff
-    ? rawAllOrders.filter((o) => String(o.assignedToUserId) === String(user?.id))
+    ? rawAllOrders.filter((o) => String(o.assignedToUserId) === String(user?.id || (user as any)?.userId))
     : rawAllOrders
   ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

@@ -4,6 +4,8 @@ import { persist } from 'zustand/middleware';
 export type CustomStatus =
   | 'FORWARDED_TO_MANAGER'
   | 'STAFF_ASSIGNED'
+  | 'ACCEPTED'
+  | 'IN_PROGRESS'
   | 'STAFF_COMPLETED'
   | 'MANAGER_VERIFIED';
 

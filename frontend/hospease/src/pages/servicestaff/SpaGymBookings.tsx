@@ -177,6 +177,12 @@ export default function SpaGymBookings() {
                     <p className="font-semibold text-gray-900">{b.description ?? `${b.serviceType} Service`}</p>
                     <p className="text-sm text-gray-600">{b.serviceType.replace('_', ' ')} {b.roomId ? `• Room ${b.roomId}` : ''}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{formatRelative(b.createdAt)}</p>
+                    <div className="flex items-center gap-4 text-[10px] text-gray-500 border-t border-gray-50 pt-1 mt-1">
+                      <span>Assigned to: <strong className="text-navy-900 font-bold">{user?.name}</strong></span>
+                      <span className="font-bold uppercase text-[8px] px-1 bg-gray-50 rounded text-gray-600">
+                        {b.status === 'CONFIRMED' ? 'ASSIGNED' : b.status}
+                      </span>
+                    </div>
                   </div>
                   <div className="text-right">
                     {b.price > 0 && !isServiceStaff && <p className="font-bold text-gray-800">{formatCurrency(b.price)}</p>}

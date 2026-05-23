@@ -166,6 +166,12 @@ export default function FBOrders() {
                     <p className="text-xs text-gray-600 font-medium">{order.roomId ? `Room ${order.roomId}` : 'Dine-in'}</p>
                     <p className="text-xs text-gray-400">{order.description?.slice(0, 30) ?? 'No description'}</p>
                     <p className="text-xs text-gray-400 mt-1">{formatRelative(order.createdAt)}</p>
+                    <div className="flex items-center justify-between text-[10px] text-gray-500 border-t border-gray-50 pt-1.5 mt-1.5">
+                       <span>Assigned to: <strong className="text-navy-900 font-bold">{user?.name}</strong></span>
+                       <span className="px-1.5 py-0.5 bg-gray-50 rounded text-gray-600 font-bold uppercase text-[8px]">
+                         {order.status === 'CONFIRMED' ? 'READY' : order.status}
+                       </span>
+                     </div>
                     {order.price > 0 && !isServiceStaff && <p className="text-xs font-semibold text-gray-600 mt-1">{formatCurrency(order.price)}</p>}
                     {STATUS_FLOW[status] && (
                       <button onClick={(e) => { e.stopPropagation(); advance(order.orderId, order.status); }}

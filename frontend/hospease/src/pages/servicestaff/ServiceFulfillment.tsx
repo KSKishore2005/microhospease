@@ -138,7 +138,13 @@ export default function ServiceFulfillment() {
                       {req.description && (
                         <p className="text-sm text-gray-700 mb-2 leading-snug line-clamp-2">{req.description}</p>
                       )}
-                      <p className="text-xs text-gray-400 mb-3">{formatRelative(req.createdAt)}</p>
+                      <p className="text-xs text-gray-400 mb-1">{formatRelative(req.createdAt)}</p>
+                      <div className="flex items-center justify-between text-xs text-gray-500 border-t border-gray-50 pt-2 mt-2">
+                        <span>Assigned to: <strong className="text-navy-900 font-bold">{user?.name}</strong></span>
+                        <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-600 font-bold uppercase text-[9px]">
+                          {req.status === 'CONFIRMED' ? 'ASSIGNED' : req.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
 
                       {/* Start Work button */}
                       {isConfirmed && (

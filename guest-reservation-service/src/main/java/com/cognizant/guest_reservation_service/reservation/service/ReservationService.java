@@ -171,7 +171,10 @@ public class ReservationService {
 
         // Sync room status based on the new reservation state.
         switch (newStatus) {
-            case CHECKED_IN  -> safelyUpdateRoomStatus(reservation.getRoomId(), "OCCUPIED");
+            case CHECKED_IN  -> {
+                safelyUpdateRoomStatus(reservation.getRoomId(), "OCCUPIED");
+                tryGenerateInvoice(reservation.getResId());
+            }
             case CHECKED_OUT -> {
                 safelyUpdateRoomStatus(reservation.getRoomId(), "CLEANING");
                 // Auto-generate the invoice now that the stay is complete. This is

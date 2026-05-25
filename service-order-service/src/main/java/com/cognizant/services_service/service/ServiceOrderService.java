@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
@@ -91,6 +92,19 @@ public class ServiceOrderService {
     public ServiceOrderResponseDto createOrder(ServiceOrderRequestDto dto) {
         log.info("Creating service order for guestId={}, reservationId={}, roomId={}",
                 dto.getGuestId(), dto.getReservationId(), dto.getRoomId());
+
+        // Assign default non-zero prices based on ServiceType to service orders when created with zero/null price
+        if (dto.getPrice() == null || dto.getPrice().compareTo(BigDecimal.ZERO) == 0) {
+            BigDecimal defaultPrice = switch (dto.getServiceType()) {
+                case SPA -> BigDecimal.valueOf(85.00);
+                case GYM -> BigDecimal.valueOf(50.00);
+                case LAUNDRY -> BigDecimal.valueOf(35.00);
+                case ROOM_SERVICE, RESTAURANT, FOOD_AND_BEVERAGES -> BigDecimal.valueOf(65.00);
+                case TRANSPORT -> BigDecimal.valueOf(45.00);
+                default -> BigDecimal.valueOf(25.00);
+            };
+            dto.setPrice(defaultPrice);
+        }
 
         GuestDto guest = null;
         RoomDto room = null;
@@ -286,8 +300,11 @@ public class ServiceOrderService {
         boolean valid = switch (current) {
             case PENDING     -> next == ServiceOrderStatus.CONFIRMED
                                 || next == ServiceOrderStatus.IN_PROGRESS
+                                || next == ServiceOrderStatus.COMPLETED
                                 || next == ServiceOrderStatus.CANCELLED;
-            case CONFIRMED   -> next == ServiceOrderStatus.IN_PROGRESS || next == ServiceOrderStatus.CANCELLED;
+            case CONFIRMED   -> next == ServiceOrderStatus.IN_PROGRESS
+                                || next == ServiceOrderStatus.COMPLETED
+                                || next == ServiceOrderStatus.CANCELLED;
             case IN_PROGRESS -> next == ServiceOrderStatus.COMPLETED   || next == ServiceOrderStatus.CANCELLED;
             case COMPLETED, CANCELLED -> false;
         };

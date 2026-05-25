@@ -75,6 +75,9 @@ export const reportsApi = {
 
   delete: (id: string) =>
     apiClient.delete(`/reports/${id}`),
+
+  download: (id: string) =>
+    apiClient.get<Blob>(`/reports/${id}/download`, { responseType: 'blob' }).then((r) => r.data),
 };
 
 export const kpisApi = {

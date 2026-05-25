@@ -40,7 +40,7 @@ export default function RoomStatus() {
   });
 
   const housekeepingStaff = allUsers.filter(
-    (u) => (u.role === 'HOUSEKEEPING_STAFF' || u.role === 'HOUSEKEEPING') && u.status === 'ACTIVE'
+    (u) => u.role === 'HOUSEKEEPING_STAFF' && u.status === 'ACTIVE'
   );
 
   const updateStatusMutation = useMutation({

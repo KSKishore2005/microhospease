@@ -8,6 +8,7 @@ import com.cognizant.enums.UserRole;
 import com.cognizant.security.RoleRequired;
 import com.cognizant.service.StaffService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -108,8 +109,20 @@ public class StaffController {
             @RequestBody StaffRequestDto dto,
             @RequestParam(required = false) Long userId) {
         Staff entity = toEntity(dto);
-        Staff saved = staffService.createStaff(entity, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toDto(saved));
+        try {
+            Staff saved = staffService.createStaff(entity, userId);
+            return ResponseEntity.status(HttpStatus.CREATED).body(toDto(saved));
+        } catch (DataIntegrityViolationException ex) {
+            // The most common cause here is the UNIQUE constraint on staff.user_id:
+            // the caller passed a userId that is already linked to another staff row.
+            // Surface a clear 409 instead of the generic 500 stack trace so the UI
+            // can show "this user already has a staff profile" rather than a cryptic
+            // SQL error.
+            String msg = userId != null
+                    ? "User " + userId + " is already linked to another staff profile."
+                    : "Staff record violates a uniqueness constraint: " + ex.getMostSpecificCause().getMessage();
+            throw new com.cognizant.exception.BadRequestException(msg);
+        }
     }
 
     @PutMapping("/{id}")

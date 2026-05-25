@@ -45,7 +45,7 @@ export default function TaskList() {
   const userMap = useMemo(() => new Map(users.map((u) => [String(u.userId), u.name])), [users]);
 
   const housekeepingStaff = useMemo(
-    () => users.filter((u) => u.role === 'HOUSEKEEPING_STAFF' || u.role === 'HOUSEKEEPING'),
+    () => users.filter((u) => u.role === 'HOUSEKEEPING_STAFF'),
     [users]
   );
 

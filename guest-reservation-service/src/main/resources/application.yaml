@@ -27,6 +27,10 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQL8Dialect
     open-in-view: false
+    # Run schema.sql AFTER Hibernate creates the tables. The script applies
+    # idempotent ALTER TABLE statements that relax legacy NOT NULL constraints
+    # Hibernate cannot loosen on its own (see schema.sql for the phone-column bug).
+    defer-datasource-initialization: true
 
   jackson:
     serialization:
@@ -35,7 +39,7 @@ spring:
 
   sql:
     init:
-      mode: never
+      mode: always
 
   cloud:
     openfeign:

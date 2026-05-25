@@ -4,8 +4,34 @@ REM HospEase - Start All Microservices
 REM ============================================================
 
 set ROOT=%~dp0
-set "JAVA_HOME=C:\Users\Kishore\Downloads\jdk-21.0.10"
+
+REM Use system JAVA_HOME if already set, otherwise auto-detect
+if not defined JAVA_HOME (
+    REM Try common Java locations
+    if exist "C:\Program Files\Java\jdk-21" (
+        set "JAVA_HOME=C:\Program Files\Java\jdk-21"
+    ) else if exist "C:\Program Files\OpenJDK\jdk-21" (
+        set "JAVA_HOME=C:\Program Files\OpenJDK\jdk-21"
+    ) else if exist "C:\Java\jdk-21" (
+        set "JAVA_HOME=C:\Java\jdk-21"
+    ) else (
+        echo ERROR: JAVA_HOME not set and JDK not found in standard locations
+        echo Please set JAVA_HOME environment variable to your JDK installation folder
+        pause
+        exit /b 1
+    )
+)
+
+REM Validate JAVA_HOME
+if not exist "%JAVA_HOME%\bin\java.exe" (
+    echo ERROR: JAVA_HOME pointing to invalid location: %JAVA_HOME%
+    echo Please verify JAVA_HOME contains bin\java.exe
+    pause
+    exit /b 1
+)
+
 set "PATH=%JAVA_HOME%\bin;%PATH%"
+echo JAVA_HOME: %JAVA_HOME%
 
 echo ============================================================
 echo HospEase Microservices Startup

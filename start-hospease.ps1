@@ -3,8 +3,32 @@
 # HospEase - PowerShell Microservice Launcher
 # ============================================================
 $ROOT = $PSScriptRoot
-$env:JAVA_HOME = "C:\Users\Kishore\Downloads\jdk-21.0.10"
-$env:PATH += ";C:\Users\Kishore\.m2\wrapper\dists\apache-maven-3.9.15\0226a00282e400185496f3b60ec5a3f029cbdc6893912937d4876d57695224e1\bin"
+
+# Use system JAVA_HOME if set, otherwise auto-detect
+if (-not $env:JAVA_HOME) {
+    $javaPaths = @(
+        "C:\Program Files\Java\jdk-21",
+        "C:\Program Files\OpenJDK\jdk-21",
+        "C:\Java\jdk-21"
+    )
+    
+    foreach ($path in $javaPaths) {
+        if (Test-Path "$path\bin\java.exe") {
+            $env:JAVA_HOME = $path
+            break
+        }
+    }
+}
+
+# Validate JAVA_HOME
+if (-not (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
+    Write-Host "ERROR: JAVA_HOME not set or invalid: $env:JAVA_HOME" -ForegroundColor Red
+    Write-Host "Please set JAVA_HOME to your JDK installation folder" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
+Write-Host "Using JAVA_HOME: $env:JAVA_HOME" -ForegroundColor Cyan
 
 function Start-Service($name, $waitSec) {
     Write-Host "[HospEase] Starting $name..." -ForegroundColor Cyan

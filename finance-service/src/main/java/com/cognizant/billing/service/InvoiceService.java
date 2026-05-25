@@ -371,10 +371,9 @@ public class InvoiceService {
                 changed = true;
             }
 
-            LocalDate checkOutDate = reservation.getCheckOutDate();
             LocalDate dueDate = invoice.getDueDate();
             LocalDate now = LocalDate.now();
-            if ((checkOutDate != null && now.isAfter(checkOutDate)) || (dueDate != null && now.isAfter(dueDate))) {
+            if (dueDate != null && now.isAfter(dueDate)) {
                 if (invoice.getStatus() != InvoiceStatus.OVERDUE) {
                     invoice.setStatus(InvoiceStatus.OVERDUE);
                     changed = true;

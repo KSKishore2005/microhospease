@@ -34,9 +34,8 @@ export default function ManagerDashboard() {
   const serviceStaff = allUsers.filter(
     (u) =>
       (u.role === 'RESTAURANT_SERVICE_STAFF' ||
-       u.role === 'SERVICE_STAFF' ||
        u.role === 'HOUSEKEEPING_STAFF' ||
-       u.role === 'HOUSEKEEPING') &&
+       u.role === 'FRONT_DESK_STAFF') &&
       u.status === 'ACTIVE'
   );
 

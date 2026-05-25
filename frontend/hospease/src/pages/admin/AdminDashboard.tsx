@@ -9,14 +9,15 @@ import { roomsApi } from '../../api/rooms';
 import { formatRelative } from '../../utils/formatters';
 
 const roleColors: Record<string, string> = {
-  ADMIN:         'bg-purple-100 text-purple-700',
-  MANAGER:       'bg-blue-100   text-blue-700',
-  FRONT_DESK:    'bg-emerald-100 text-emerald-700',
-  HOUSEKEEPING:  'bg-amber-100  text-amber-700',
-  SERVICE_STAFF: 'bg-orange-100 text-orange-700',
-  FINANCE:       'bg-teal-100   text-teal-700',
-  REPORTING:     'bg-indigo-100 text-indigo-700',
-  GUEST:         'bg-yellow-100 text-yellow-700',
+  ADMINISTRATOR:            'bg-purple-100 text-purple-700',
+  MANAGER:                  'bg-blue-100 text-blue-700',
+  FRONT_DESK_STAFF:         'bg-emerald-100 text-emerald-700',
+  HOUSEKEEPING_STAFF:       'bg-amber-100 text-amber-700',
+  RESTAURANT_SERVICE_STAFF: 'bg-orange-100 text-orange-700',
+  FINANCE_OFFICER:          'bg-teal-100 text-teal-700',
+  AUDITOR:                  'bg-indigo-100 text-indigo-700',
+  GUEST:                    'bg-yellow-100 text-yellow-700',
+  STAFF:                    'bg-gray-100 text-gray-700',
 };
 
 export default function AdminDashboard() {
@@ -89,7 +90,7 @@ export default function AdminDashboard() {
               return (
                 <div key={role} className="flex items-center gap-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap w-32 text-center ${roleColors[role] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {role.replace('_', ' ')}
+                    {role.replace(/_/g, ' ')}
                   </span>
                   <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-navy-600 to-navy-400 rounded-full transition-all duration-500"

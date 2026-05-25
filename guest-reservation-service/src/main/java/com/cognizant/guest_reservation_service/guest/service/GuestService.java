@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -76,16 +77,15 @@ public class GuestService {
     /**
      * Idempotent "ensure I have a guest profile" entry point.
      *
-     * <p>Deliberately NOT @Transactional. Spring AOP's proxy doesn't intercept
-     * self-invocations, so any attempt to use @Transactional(REQUIRES_NEW) on
-     * helper methods called via {@code this.foo()} silently runs in the outer
-     * context. By keeping this method transaction-free, each
-     * {@code guestRepository.X()} call uses its own implicit per-call transaction
-     * opened by Spring Data JPA. The earlier exception ("null id in Guest entry —
-     * don't flush the Session after an exception occurs") was caused by trying to
-     * keep using a poisoned JPA session after save() threw; that no longer happens
-     * because the failed save and the retry-read live in separate transactions.
+     * <p>Runs with {@code Propagation.NOT_SUPPORTED} to explicitly suspend any
+     * surrounding transaction (the class-level {@code @Transactional} otherwise
+     * wraps every public method). Each {@code guestRepository.X()} call below
+     * therefore opens its own implicit per-call transaction. This isolates the
+     * failed-save case so a constraint violation cannot poison the session and
+     * cause the surface-level Hibernate "null id in Guest entry" error during a
+     * subsequent retry-read.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public GuestResponseDto upsertByEmail(String name, String email, String phone) {
         log.info("Upserting guest profile for email={}", email);
 
@@ -96,7 +96,8 @@ public class GuestService {
             throw new BadRequestException("Email is required for profile creation.");
         }
 
-        // Each repository call below is its own transaction — see method javadoc.
+        // Each repository call below runs in its own implicit transaction because
+        // the surrounding @Transactional was suspended by NOT_SUPPORTED above.
         Optional<Guest> existing = guestRepository.findByEmailIgnoreCase(email);
         if (existing.isPresent()) {
             return GuestMapper.toResponseDto(existing.get());
@@ -113,13 +114,19 @@ public class GuestService {
             Guest saved = guestRepository.save(entity);
             log.info("Upsert created new guest id={} for email={}", saved.getGuestId(), email);
             return GuestMapper.toResponseDto(saved);
-        } catch (DataIntegrityViolationException race) {
-            // Concurrent insert won the race — re-read in a fresh transaction.
-            log.warn("Upsert lost race for email={} ({}), refetching", email, race.getMessage());
+        } catch (Exception ex) {
+            // Any failure on save (constraint race, poisoned session from a prior
+            // request, dialect mismatch, etc.) — fall back to a fresh read. If a
+            // concurrent insert succeeded, we'll find that row and return it. If
+            // truly nothing is there, surface a clean BadRequest with the original
+            // message so the frontend can show something useful.
+            log.warn("Upsert save failed for email={} ({}), refetching",
+                    email, ex.getMessage());
             return guestRepository.findByEmailIgnoreCase(email)
                     .map(GuestMapper::toResponseDto)
                     .orElseThrow(() -> new BadRequestException(
-                            "Could not create or find guest profile for " + email));
+                            "Could not create or find guest profile for " + email
+                                    + ". Root cause: " + ex.getMessage()));
         }
     }
 

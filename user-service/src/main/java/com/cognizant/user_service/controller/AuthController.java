@@ -34,9 +34,15 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String token) {
-        authService.logout(token);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<Void> logout(
+            @RequestHeader(value = "Authorization", required = false) String token) {
+        // Logout is best-effort: if the client already cleared its token (e.g.
+        // after a 401 redirect), the header may be missing. Treat that as a
+        // no-op success instead of returning 500 with a noisy stack trace.
+        if (token != null && !token.isBlank()) {
+            authService.logout(token);
+        }
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/refresh-token")

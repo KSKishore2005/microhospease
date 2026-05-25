@@ -164,7 +164,7 @@ public class PaymentService {
             if (remaining.compareTo(invoice.getTotalAmount()) >= 0) {
                 invoice.setStatus(InvoiceStatus.PAID);
             } else {
-                invoice.setStatus(InvoiceStatus.REFUNDED);
+                invoice.setStatus(InvoiceStatus.UNPAID);
             }
             invoiceRepository.save(invoice);
         }

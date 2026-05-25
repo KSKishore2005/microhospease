@@ -65,8 +65,8 @@ export default function StaffScheduling() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [staffForm, setStaffForm] = useState({
     name: '',
-    role: 'SERVICE_STAFF',
-    department: 'Service Staff',
+    role: 'RESTAURANT_SERVICE_STAFF',
+    department: 'Restaurant Service',
     phone: '',
     email: '',
     status: 'ACTIVE',
@@ -101,8 +101,8 @@ export default function StaffScheduling() {
       setShowAddStaff(false);
       setStaffForm({
         name: '',
-        role: 'SERVICE_STAFF',
-        department: 'Service Staff',
+        role: 'RESTAURANT_SERVICE_STAFF',
+        department: 'Restaurant Service',
         phone: '',
         email: '',
         status: 'ACTIVE',
@@ -168,19 +168,21 @@ export default function StaffScheduling() {
     setSelectedUserId(userId);
     const selectedUser = users.find((u) => String(u.userId) === String(userId));
     if (selectedUser) {
-      let dept = 'Service Staff';
-      if (selectedUser.role === 'HOUSEKEEPING' || selectedUser.role === 'HOUSEKEEPING_STAFF') {
+      let dept = 'Restaurant Service';
+      if (selectedUser.role === 'HOUSEKEEPING_STAFF') {
         dept = 'Housekeeping';
-      } else if (selectedUser.role === 'FRONT_DESK' || selectedUser.role === 'FRONT_DESK_STAFF') {
+      } else if (selectedUser.role === 'FRONT_DESK_STAFF') {
         dept = 'Front Desk';
-      } else if (selectedUser.role === 'FINANCE') {
+      } else if (selectedUser.role === 'FINANCE_OFFICER') {
         dept = 'Finance';
-      } else if (selectedUser.role === 'MANAGER') {
+      } else if (selectedUser.role === 'MANAGER' || selectedUser.role === 'ADMINISTRATOR') {
         dept = 'Management';
+      } else if (selectedUser.role === 'AUDITOR') {
+        dept = 'Audit';
       }
       setStaffForm({
         name: selectedUser.name || '',
-        role: selectedUser.role || 'SERVICE_STAFF',
+        role: selectedUser.role || 'RESTAURANT_SERVICE_STAFF',
         department: dept,
         phone: selectedUser.phone || '',
         email: selectedUser.email || '',
@@ -429,9 +431,9 @@ export default function StaffScheduling() {
               onChange={(e) => setForm((f) => ({ ...f, staffId: e.target.value }))}
               className="select">
               <option value="">Select staff member…</option>
-              {staff.map((s) => (
+              {activeStaff.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} ({s.department})
+                  {s.name ? `${s.name} (${s.department})` : `Staff #${s.id} (${s.department})`}
                 </option>
               ))}
             </select>
@@ -557,13 +559,19 @@ export default function StaffScheduling() {
             </div>
             <div>
               <label className="input-label">Role</label>
-              <input
-                type="text"
+              <select
                 value={staffForm.role}
                 onChange={(e) => setStaffForm((f) => ({ ...f, role: e.target.value }))}
-                placeholder="e.g. HOUSEKEEPING_STAFF"
-                className="input"
-              />
+                className="select">
+                <option value="RESTAURANT_SERVICE_STAFF">Restaurant Service Staff</option>
+                <option value="HOUSEKEEPING_STAFF">Housekeeping Staff</option>
+                <option value="FRONT_DESK_STAFF">Front Desk Staff</option>
+                <option value="FINANCE_OFFICER">Finance Officer</option>
+                <option value="MANAGER">Manager</option>
+                <option value="ADMINISTRATOR">Administrator</option>
+                <option value="AUDITOR">Auditor</option>
+                <option value="STAFF">Staff</option>
+              </select>
             </div>
           </div>
 

@@ -130,7 +130,7 @@ export default function ServiceFulfillment() {
                             {req.serviceType.replace(/_/g, ' ')}
                           </p>
                           <p className="text-xs text-gray-500 mt-0.5">
-                            {req.roomId ? `Room ${req.roomId}` : 'No room'}
+                            {req.roomId ? `Room ${req.roomId}` : 'No room'} {req.guest?.name ? `· ${req.guest.name}` : ''}
                           </p>
                         </div>
                       </div>

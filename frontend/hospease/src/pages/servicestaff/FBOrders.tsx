@@ -161,7 +161,7 @@ export default function FBOrders() {
                         {order.serviceType.replace('_', ' ')}
                       </Badge>
                     </div>
-                    <p className="text-xs text-gray-600 font-medium">{order.roomId ? `Room ${order.roomId}` : 'Dine-in'}</p>
+                    <p className="text-xs text-gray-600 font-medium">{order.roomId ? `Room ${order.roomId}` : 'Dine-in'} {order.guest?.name ? `· ${order.guest.name}` : ''}</p>
                     <p className="text-xs text-gray-400">{order.description?.slice(0, 30) ?? 'No description'}</p>
                     <p className="text-xs text-gray-400 mt-1">{formatRelative(order.createdAt)}</p>
                     <div className="flex items-center justify-between text-[10px] text-gray-500 border-t border-gray-50 pt-1.5 mt-1.5">

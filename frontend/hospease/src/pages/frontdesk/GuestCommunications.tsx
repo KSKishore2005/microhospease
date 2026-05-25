@@ -11,7 +11,7 @@ import { formatRelative } from '../../utils/formatters';
 import { useToastStore } from '../../store/toastStore';
 import { useWorkflowStore } from '../../store/workflowStore';
 
-const TYPE_FILTERS = ['ALL', 'ROOM_SERVICE', 'MAINTENANCE', 'CONCIERGE', 'HOUSEKEEPING', 'OTHER'] as const;
+const TYPE_FILTERS = ['ALL', 'ROOM_SERVICE', 'LAUNDRY', 'SPA', 'GYM', 'FOOD_AND_BEVERAGES'] as const;
 type TypeFilter = (typeof TYPE_FILTERS)[number];
 
 interface Reply { text: string; createdAt: string; }
@@ -78,9 +78,11 @@ export default function GuestCommunications() {
   const filtered = typeFilter === 'ALL' ? serviceOrders : serviceOrders.filter((o) => o.serviceType === typeFilter);
 
   const typeColors: Record<string, string> = {
-    ROOM_SERVICE: 'bg-blue-100 text-blue-700', MAINTENANCE: 'bg-rose-100 text-rose-700',
-    CONCIERGE: 'bg-emerald-100 text-emerald-700', HOUSEKEEPING: 'bg-purple-100 text-purple-700',
-    SPA: 'bg-purple-100 text-purple-700', OTHER: 'bg-gray-100 text-gray-600',
+    ROOM_SERVICE: 'bg-blue-100 text-blue-700',
+    LAUNDRY: 'bg-indigo-100 text-indigo-700',
+    SPA: 'bg-purple-100 text-purple-700',
+    GYM: 'bg-emerald-100 text-emerald-700',
+    FOOD_AND_BEVERAGES: 'bg-amber-100 text-amber-700',
   };
 
   return (

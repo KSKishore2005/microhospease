@@ -13,15 +13,11 @@ import { formatDate, formatRelative } from '../../utils/formatters';
 import { useWorkflowStore } from '../../store/workflowStore';
 
 const SERVICE_TYPES: { type: ServiceType; label: string; icon: string }[] = [
-  { type: 'ROOM_SERVICE',  label: 'Room Service',  icon: '🍽️' },
-  { type: 'HOUSEKEEPING',  label: 'Housekeeping',  icon: '🧹' },
-  { type: 'MAINTENANCE',   label: 'Maintenance',   icon: '🔧' },
-  { type: 'LAUNDRY',       label: 'Laundry',       icon: '👕' },
-  { type: 'SPA',           label: 'Spa',           icon: '💆' },
-  { type: 'GYM',           label: 'Gym',           icon: '🏋️' },
-  { type: 'TRANSPORT',     label: 'Transport',     icon: '🚗' },
-  { type: 'CONCIERGE',     label: 'Concierge',     icon: '🔑' },
-  { type: 'OTHER',         label: 'Other',         icon: '📋' },
+  { type: 'ROOM_SERVICE',        label: 'Room Service',     icon: '🍽️' },
+  { type: 'FOOD_AND_BEVERAGES',  label: 'Food & Beverage',  icon: '🍴' },
+  { type: 'LAUNDRY',             label: 'Laundry',          icon: '👕' },
+  { type: 'SPA',                 label: 'Spa',              icon: '💆' },
+  { type: 'GYM',                 label: 'Gym',              icon: '🏋️' },
 ];
 
 const TYPE_ICON: Record<string, string> = Object.fromEntries(

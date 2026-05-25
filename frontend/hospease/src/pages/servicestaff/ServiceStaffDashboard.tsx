@@ -30,7 +30,7 @@ export default function ServiceStaffDashboard() {
   // Filter to show only tasks assigned to this service staff member
   const myOrders = allOrders.filter((o) => String(o.assignedToUserId) === String(userId));
 
-  const restaurantOrders = myOrders.filter((o) => o.serviceType === 'RESTAURANT' || o.serviceType === 'ROOM_SERVICE');
+  const restaurantOrders = myOrders.filter((o) => o.serviceType === 'FOOD_AND_BEVERAGES' || o.serviceType === 'ROOM_SERVICE' || o.serviceType === 'RESTAURANT');
   const spaOrders = myOrders.filter((o) => o.serviceType === 'SPA' || o.serviceType === 'GYM');
 
   const orders      = restaurantOrders;

@@ -1,13 +1,15 @@
 import apiClient from './client';
 
 export type ServiceType =
-  | 'RESTAURANT'
+  | 'ROOM_SERVICE'
+  | 'FOOD_AND_BEVERAGES'
   | 'LAUNDRY'
-  | 'MAINTENANCE'
-  | 'CONCIERGE'
   | 'SPA'
   | 'GYM'
-  | 'ROOM_SERVICE'
+  // Legacy types (kept for backward compatibility with existing DB records)
+  | 'RESTAURANT'
+  | 'MAINTENANCE'
+  | 'CONCIERGE'
   | 'HOUSEKEEPING'
   | 'TRANSPORT'
   | 'OTHER';

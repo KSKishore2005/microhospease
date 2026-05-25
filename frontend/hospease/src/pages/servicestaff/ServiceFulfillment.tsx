@@ -15,8 +15,8 @@ const COLUMNS: { status: Status; label: string; headerColor: string; cardBorder:
 ];
 
 const typeEmoji: Record<string, string> = {
-  ROOM_SERVICE: '🍽️', HOUSEKEEPING: '🧹', MAINTENANCE: '🔧', CONCIERGE: '🔑',
-  SPA: '💆', LAUNDRY: '👕', GYM: '🏋️', TRANSPORT: '🚗', RESTAURANT: '🍴', OTHER: '📋',
+  ROOM_SERVICE: '🍽️', FOOD_AND_BEVERAGES: '🍴', LAUNDRY: '👕',
+  SPA: '💆', GYM: '🏋️',
 };
 
 export default function ServiceFulfillment() {

@@ -4,7 +4,8 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
-import Badge, { statusBadge } from '../../components/common/Badge';
+import Badge from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import { invoicesApi } from '../../api/invoices';
 import { paymentsApi } from '../../api/payments';
@@ -15,9 +16,18 @@ import { useToastStore } from '../../store/toastStore';
 export default function FinanceDashboard() {
   const addToast = useToastStore((s) => s.addToast);
 
-  const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: invoicesApi.getAll });
-  const { data: payments = [] } = useQuery({ queryKey: ['payments'], queryFn: paymentsApi.getAll });
-  const { data: serviceOrders = [] } = useQuery({ queryKey: ['service-orders'], queryFn: serviceOrdersApi.getAll });
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({ queryKey: ['invoices'], queryFn: invoicesApi.getAll });
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({ queryKey: ['payments'], queryFn: paymentsApi.getAll });
+  const { data: serviceOrders = [], isLoading: ordersLoading } = useQuery({ queryKey: ['service-orders'], queryFn: serviceOrdersApi.getAll });
+
+  if (invoicesLoading || paymentsLoading || ordersLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   // Calculate actual revenue from invoices
   const totalRevenue = invoices.reduce((s, i) => s + (i.amountPaid ?? 0), 0);
@@ -186,6 +196,9 @@ export default function FinanceDashboard() {
                   </div>
                 </div>
               ))}
+              {invoices.length === 0 && (
+                <div className="text-center py-10 text-gray-400 text-sm">No invoices found.</div>
+              )}
             </div>
           </Card>
         </div>
@@ -237,6 +250,9 @@ export default function FinanceDashboard() {
                   </div>
                 </div>
               ))}
+              {payments.length === 0 && (
+                <div className="text-center py-10 text-gray-400 text-sm">No payments recorded yet.</div>
+              )}
             </div>
           </Card>
         </div>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
-import Badge, { statusBadge } from '../../components/common/Badge';
+
 import { usersApi, auditLogsApi } from '../../api/users';
 import { roomsApi } from '../../api/rooms';
 import { formatRelative } from '../../utils/formatters';
@@ -24,6 +24,15 @@ export default function AdminDashboard() {
   const { data: users = [],     isSuccess: usersOk,  isError: usersErr,  isLoading: usersLoading }  = useQuery({ queryKey: ['users'],      queryFn: usersApi.getAll });
   const { data: auditLogs = [], isSuccess: auditOk,  isError: auditErr,  isLoading: auditLoading }  = useQuery({ queryKey: ['audit-logs'], queryFn: auditLogsApi.getAll });
   const { data: rooms = [],     isSuccess: roomsOk,  isError: roomsErr,  isLoading: roomsLoading }  = useQuery({ queryKey: ['rooms'],      queryFn: roomsApi.getAll });
+
+  if (usersLoading || auditLoading || roomsLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   const activeUsers = users.filter((u) => u.status === 'ACTIVE').length;
   const recentLogs  = auditLogs.slice(0, 8);
@@ -85,7 +94,7 @@ export default function AdminDashboard() {
         <Card title="User Role Distribution" icon={<Users size={16} />}>
           <div className="space-y-3">
             {roleEntries.map(([role, count]) => {
-              const pct = Math.round((count / users.length) * 100);
+
               const barPct = Math.round((count / maxCount) * 100);
               return (
                 <div key={role} className="flex items-center gap-3">

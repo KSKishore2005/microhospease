@@ -5,13 +5,13 @@ import {
   ClipboardList, BedDouble,
   ShoppingCart, Leaf, Layers,
   DollarSign, RotateCcw, BarChart2, Users, Clock, TrendingUp, Hotel,
-  Settings, Shield, DownloadCloud, PieChart, Table2, Award,
-  LogOut, ChevronLeft, ChevronRight, Sparkles,
+  Settings, Shield, PieChart, Table2, Award,
+  LogOut, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import type { UserRole } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../utils/cn';
-import { hospeaseLogo } from './HospEaseLogo';
+import hospeaseLogo from '../../assets/hospease-logo.png';
 
 interface NavItem { label: string; path: string; icon: React.ReactNode; }
 

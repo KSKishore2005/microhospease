@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BedDouble, Wrench, Sparkles, Users } from 'lucide-react';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import { roomsApi } from '../../api/rooms';
 import { usersApi } from '../../api/users';
 import { housekeepingApi } from '../../api/housekeeping';
 import { useAuthStore } from '../../store/authStore';
-import { useRoomStatusStore, type RoomFlag } from '../../store/roomStatusStore';
+import { useRoomStatusStore } from '../../store/roomStatusStore';
 import { cn } from '../../utils/cn';
 
 // Frontend display states mapped from DB status + local flags
@@ -26,7 +26,7 @@ const DISPLAY_OPTIONS: DisplayStatus[] = ['DIRTY', 'CLEANING', 'CLEAN', 'READY']
 export default function RoomStatus() {
   const [filter, setFilter] = useState<DisplayStatus | 'ALL'>('ALL');
   const queryClient = useQueryClient();
-  const { roomFlags, setFlag, clearFlag, getFlag } = useRoomStatusStore();
+  const { setFlag, clearFlag, getFlag } = useRoomStatusStore();
 
   const { data: rooms = [] } = useQuery({ queryKey: ['rooms'], queryFn: roomsApi.getAll });
 

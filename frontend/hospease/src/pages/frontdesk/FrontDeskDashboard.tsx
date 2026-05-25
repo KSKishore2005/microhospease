@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
-import Badge, { statusBadge } from '../../components/common/Badge';
+import Badge from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import { reservationsApi } from '../../api/reservations';
 import { roomsApi } from '../../api/rooms';
 import { serviceOrdersApi } from '../../api/serviceOrders';
@@ -13,9 +14,9 @@ import { useToastStore } from '../../store/toastStore';
 
 export default function FrontDeskDashboard() {
   const today = new Date().toISOString().split('T')[0];
-  const { data: reservations = [] } = useQuery({ queryKey: ['reservations'], queryFn: reservationsApi.getAll });
-  const { data: rooms = [] }        = useQuery({ queryKey: ['rooms'],        queryFn: roomsApi.getAll });
-  const { data: serviceOrders = [] } = useQuery({ queryKey: ['service-orders'], queryFn: serviceOrdersApi.getAll });
+  const { data: reservations = [], isLoading: resLoading } = useQuery({ queryKey: ['reservations'], queryFn: reservationsApi.getAll });
+  const { data: rooms = [], isLoading: roomsLoading }        = useQuery({ queryKey: ['rooms'],        queryFn: roomsApi.getAll });
+  const { data: serviceOrders = [], isLoading: ordersLoading } = useQuery({ queryKey: ['service-orders'], queryFn: serviceOrdersApi.getAll });
 
   const queryClient = useQueryClient();
   const { customStatuses, setStatus, clearStatus } = useWorkflowStore();
@@ -31,6 +32,15 @@ export default function FrontDeskDashboard() {
       addToast('Request closed and billed successfully', 'success');
     },
   });
+
+  if (resLoading || roomsLoading || ordersLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   // Service requests that need front desk attention
   const pendingRequests = serviceOrders.filter((o) =>

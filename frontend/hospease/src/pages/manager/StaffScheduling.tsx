@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Plus, CalendarDays, Users, Building2, Clock, AlertCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
@@ -7,7 +7,7 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { staffApi, shiftsApi } from '../../api/staff';
 import { usersApi } from '../../api/users';
-import type { ShiftEntity } from '../../api/staff';
+import type { ShiftEntity, StaffRequestPayload } from '../../api/staff';
 import { formatDate } from '../../utils/formatters';
 
 const SHIFT_TYPES = ['MORNING', 'AFTERNOON', 'NIGHT'] as const;
@@ -94,7 +94,7 @@ export default function StaffScheduling() {
   });
 
   const createStaffMutation = useMutation({
-    mutationFn: ({ payload, userId }: { payload: any; userId?: string }) =>
+    mutationFn: ({ payload, userId }: { payload: StaffRequestPayload; userId?: string }) =>
       staffApi.create(payload, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['staff'] });
@@ -110,8 +110,9 @@ export default function StaffScheduling() {
       setSelectedUserId('');
       setStaffFormError(null);
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || 'Could not create staff member.';
+    onError: (err: unknown) => {
+      const apiErr = err as { response?: { data?: { message?: string } } };
+      const msg = apiErr?.response?.data?.message || (err as Error)?.message || 'Could not create staff member.';
       setStaffFormError(msg);
     },
   });
@@ -192,7 +193,11 @@ export default function StaffScheduling() {
   };
 
   // Re-clear errors when shift type / date changes so the user sees fresh feedback
-  useEffect(() => setFormError(null), [form.shiftType, form.shiftDate, form.staffId]);
+  const [prevForm, setPrevForm] = useState(form);
+  if (form.shiftType !== prevForm.shiftType || form.shiftDate !== prevForm.shiftDate || form.staffId !== prevForm.staffId) {
+    setPrevForm(form);
+    setFormError(null);
+  }
 
   return (
     <div className="space-y-6">

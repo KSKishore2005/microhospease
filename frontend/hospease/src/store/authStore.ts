@@ -43,7 +43,7 @@ export const useAuthStore = create<AuthState>()(
           const data = await authApi.login(email, password);
           const frontendRole = ROLE_MAP[data.role] ?? 'GUEST';
 
-          const resolvedId = String(data.userId || (data as any).user_id || (data as any).userId);
+          const resolvedId = data.userId;
           const user: User = {
             id: resolvedId,
             name: data.name,
@@ -83,7 +83,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const data = await authApi.register({ name, email, phone, password, role: 'GUEST' });
           const frontendRole = ROLE_MAP[data.role] ?? 'GUEST';
-          const resolvedId = String(data.userId || (data as any).user_id || (data as any).userId);
+          const resolvedId = data.userId;
           const user: User = {
             id: resolvedId,
             name: data.name,

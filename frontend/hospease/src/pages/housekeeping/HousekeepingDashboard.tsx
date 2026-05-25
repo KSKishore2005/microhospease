@@ -1,9 +1,10 @@
-import { ClipboardList, BedDouble, CheckCircle2, Clock, ArrowRight, Sparkles } from 'lucide-react';
+import { ClipboardList, CheckCircle2, Clock, ArrowRight, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
-import Badge, { statusBadge } from '../../components/common/Badge';
+import Badge from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';
 import { usersApi } from '../../api/users';
@@ -14,9 +15,9 @@ import { useRoomStatusStore } from '../../store/roomStatusStore';
 
 export default function HousekeepingDashboard() {
   const { user } = useAuthStore();
-  const { data: allTasks = [] } = useQuery({ queryKey: ['housekeeping'], queryFn: housekeepingApi.getAll });
-  const { data: rooms = [] }  = useQuery({ queryKey: ['rooms'],                     queryFn: roomsApi.getAll });
-  const { data: users = [] }  = useQuery({ queryKey: ['users'],                     queryFn: usersApi.getAll });
+  const { data: allTasks = [], isLoading: tasksLoading } = useQuery({ queryKey: ['housekeeping'], queryFn: housekeepingApi.getAll });
+  const { data: rooms = [], isLoading: roomsLoading }  = useQuery({ queryKey: ['rooms'],                     queryFn: roomsApi.getAll });
+  const { data: users = [], isLoading: usersLoading }  = useQuery({ queryKey: ['users'],                     queryFn: usersApi.getAll });
   const { roomFlags } = useRoomStatusStore();
 
   const userMap = useMemo(() => new Map(users.map((u) => [String(u.userId), u.name])), [users]);
@@ -34,10 +35,6 @@ export default function HousekeepingDashboard() {
     [rooms]
   );
 
-  const pending    = tasks.filter((t) => t.status === 'PENDING').length;
-  const inProgress = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
-  const completed  = tasks.filter((t) => t.status === 'COMPLETED').length;
-
   const roomsReady = useMemo(() => {
     return rooms.filter((r) => {
       if (r.status === 'AVAILABLE') {
@@ -47,14 +44,6 @@ export default function HousekeepingDashboard() {
       return false;
     }).length;
   }, [rooms, roomFlags]);
-
-  const cleaningRooms     = rooms.filter((r) => r.status === 'CLEANING').length;
-  const availableRooms    = rooms.filter((r) => r.status === 'AVAILABLE').length;
-  const maintenanceRooms  = rooms.filter((r) => r.status === 'MAINTENANCE').length;
-  const occupiedRooms     = rooms.filter((r) => r.status === 'OCCUPIED').length;
-
-  const total     = tasks.length;
-  const progress  = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   const activeRoomsToClean = useMemo(() => {
     const list = rooms
@@ -78,6 +67,27 @@ export default function HousekeepingDashboard() {
     }
     return list;
   }, [rooms, roomFlags, user, tasks]);
+
+  if (tasksLoading || roomsLoading || usersLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Loading dashboard...</p>
+      </div>
+    );
+  }
+
+  const pending    = tasks.filter((t) => t.status === 'PENDING').length;
+  const inProgress = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
+  const completed  = tasks.filter((t) => t.status === 'COMPLETED').length;
+
+  const cleaningRooms     = rooms.filter((r) => r.status === 'CLEANING').length;
+  const availableRooms    = rooms.filter((r) => r.status === 'AVAILABLE').length;
+  const maintenanceRooms  = rooms.filter((r) => r.status === 'MAINTENANCE').length;
+  const occupiedRooms     = rooms.filter((r) => r.status === 'OCCUPIED').length;
+
+  const total     = tasks.length;
+  const progress  = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
     <div className="space-y-6 max-w-7xl">

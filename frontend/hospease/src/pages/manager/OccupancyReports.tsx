@@ -1,4 +1,4 @@
-import { Hotel, TrendingUp, Star, DollarSign } from 'lucide-react';
+import { Hotel, TrendingUp, DollarSign } from 'lucide-react';
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';

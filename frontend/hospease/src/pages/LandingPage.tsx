@@ -5,7 +5,7 @@ import {
   MapPin, Menu, X, Phone, Mail, Clock, ChevronDown
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { hospeaseLogo } from '../components/common/HospEaseLogo';
+import hospeaseLogo from '../assets/hospease-logo.png';
 
 const HERO_SLIDES = [
   {

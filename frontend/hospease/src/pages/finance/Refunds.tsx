@@ -3,12 +3,45 @@ import { Check, Clock } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { paymentsApi } from '../../api/payments';
 import type { PaymentResponseDto } from '../../api/payments';
 import { formatCurrency, formatRelative, formatDate } from '../../utils/formatters';
+
+interface SectionProps {
+  title: string;
+  items: PaymentResponseDto[];
+  color: string;
+  onSelect: (p: PaymentResponseDto) => void;
+}
+
+const Section = ({ title, items, color, onSelect }: SectionProps) => (
+  <Card title={title} subtitle={`${items.length} payment${items.length !== 1 ? 's' : ''}`}>
+    {items.length === 0 ? (
+      <p className="text-gray-400 text-sm">None.</p>
+    ) : (
+      <div className="space-y-3">
+        {items.map((p) => (
+          <div key={p.paymentId} className={`p-4 rounded-xl border cursor-pointer hover:shadow-sm transition-all ${color}`} onClick={() => onSelect(p)}>
+            <div className="flex items-start justify-between flex-wrap gap-2">
+              <div>
+                <p className="font-semibold text-gray-900">{String(p.paymentId).slice(0, 16)}...</p>
+                <p className="text-xs text-gray-500">Invoice: {p.invoiceId} • {p.method}</p>
+                <p className="text-xs text-gray-500">{p.paidAt ? formatRelative(p.paidAt) : 'Pending'}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-bold text-gray-900">{formatCurrency(p.amount)}</p>
+                <Badge variant={statusBadge(p.status)} className="mt-1">{p.status}</Badge>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </Card>
+);
 
 export default function Refunds() {
   const [selected, setSelected] = useState<PaymentResponseDto | null>(null);
@@ -32,31 +65,7 @@ export default function Refunds() {
   const refundedPayments = payments.filter((p) => p.status === 'REFUNDED');
   const pendingPayments = payments.filter((p) => p.status === 'PENDING');
 
-  const Section = ({ title, items, color }: { title: string; items: PaymentResponseDto[]; color: string }) => (
-    <Card title={title} subtitle={`${items.length} payment${items.length !== 1 ? 's' : ''}`}>
-      {items.length === 0 ? (
-        <p className="text-gray-400 text-sm">None.</p>
-      ) : (
-        <div className="space-y-3">
-          {items.map((p) => (
-            <div key={p.paymentId} className={`p-4 rounded-xl border cursor-pointer hover:shadow-sm transition-all ${color}`} onClick={() => setSelected(p)}>
-              <div className="flex items-start justify-between flex-wrap gap-2">
-                <div>
-                  <p className="font-semibold text-gray-900">{String(p.paymentId).slice(0, 16)}...</p>
-                  <p className="text-xs text-gray-500">Invoice: {p.invoiceId} • {p.method}</p>
-                  <p className="text-xs text-gray-500">{p.paidAt ? formatRelative(p.paidAt) : 'Pending'}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-gray-900">{formatCurrency(p.amount)}</p>
-                  <Badge variant={statusBadge(p.status)} className="mt-1">{p.status}</Badge>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
+
 
   return (
     <div className="space-y-6">
@@ -84,8 +93,8 @@ export default function Refunds() {
       </div>
 
       <div className="space-y-6">
-        <Section title="Successful Payments — Refundable" items={successPayments} color="bg-blue-50 border-blue-100" />
-        <Section title="Refunded" items={refundedPayments} color="bg-gray-50 border-gray-100" />
+        <Section title="Successful Payments — Refundable" items={successPayments} color="bg-blue-50 border-blue-100" onSelect={setSelected} />
+        <Section title="Refunded" items={refundedPayments} color="bg-gray-50 border-gray-100" onSelect={setSelected} />
       </div>
 
       {selected && (

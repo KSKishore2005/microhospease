@@ -3,7 +3,7 @@ import { Download, FileBadge, Plus, Bell, CheckCircle2, Trash2 } from 'lucide-re
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { auditPackagesApi } from '../../api/reporting';
@@ -278,7 +278,7 @@ export default function ComplianceExports() {
           </div>
           <div>
             <label className="input-label">Priority</label>
-            <select value={reminderForm.priority} onChange={(e) => setReminderForm((f) => ({ ...f, priority: e.target.value as any }))}
+            <select value={reminderForm.priority} onChange={(e) => setReminderForm((f) => ({ ...f, priority: e.target.value as 'HIGH' | 'MEDIUM' | 'LOW' }))}
               className="select">
               <option value="HIGH">HIGH</option>
               <option value="MEDIUM">MEDIUM</option>

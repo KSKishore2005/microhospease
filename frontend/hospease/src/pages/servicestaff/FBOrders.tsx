@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Plus, Clock, ChefHat, Truck, CheckCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { serviceOrdersApi } from '../../api/serviceOrders';
@@ -12,7 +11,6 @@ import { reservationsApi } from '../../api/reservations';
 import { formatCurrency, formatRelative } from '../../utils/formatters';
 import { useAuthStore } from '../../store/authStore';
 
-type OrderStatus = 'PENDING' | 'IN_PROGRESS' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
 
 const STATUS_FLOW: Record<string, string | null> = {
   PENDING: 'IN_PROGRESS',
@@ -61,7 +59,7 @@ export default function FBOrders() {
 
   const rawAllOrders = [...orders, ...roomServiceOrders];
   const allOrders = (isServiceStaff
-    ? rawAllOrders.filter((o) => String(o.assignedToUserId) === String(user?.id || (user as any)?.userId))
+    ? rawAllOrders.filter((o) => String(o.assignedToUserId) === String(user?.id))
     : rawAllOrders
   ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

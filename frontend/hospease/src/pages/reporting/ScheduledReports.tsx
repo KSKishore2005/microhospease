@@ -58,7 +58,7 @@ function exportReportAsPdf(report: ReportResponseDto) {
     <span>HospEase Hotel Management System</span>
     <span>Confidential — Internal Use Only</span>
   </div>
-  <script>window.onload = () => { window.print(); }<\/script>
+  <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`;
   const w = window.open('', '_blank');

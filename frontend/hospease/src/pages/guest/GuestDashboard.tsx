@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
-import Badge, { statusBadge } from '../../components/common/Badge';
+import Badge from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import { reservationsApi } from '../../api/reservations';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import { guestsApi } from '../../api/guests';
@@ -20,17 +21,17 @@ const tierConfig: Record<string, { color: string; bg: string; border: string; ic
 export default function GuestDashboard() {
   const { effectiveGuestId: guestId, resolving } = useEffectiveGuestId();
 
-  const { data: guest } = useQuery({
+  const { data: guest, isLoading: guestLoading } = useQuery({
     queryKey: ['guest', guestId],
     queryFn: () => guestsApi.getById(guestId!),
     enabled: !!guestId,
   });
-  const { data: reservations = [] } = useQuery({
+  const { data: reservations = [], isLoading: resLoading } = useQuery({
     queryKey: ['reservations', 'guest', guestId],
     queryFn: () => reservationsApi.getByGuest(guestId!),
     enabled: !!guestId,
   });
-  const { data: serviceOrders = [] } = useQuery({
+  const { data: serviceOrders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['service-orders', 'guest', guestId],
     queryFn: () => serviceOrdersApi.getByGuest(guestId!),
     enabled: !!guestId,
@@ -42,7 +43,7 @@ export default function GuestDashboard() {
   const tier = guest?.loyaltyTier ?? 'BRONZE';
   const tc   = tierConfig[tier] ?? tierConfig.BRONZE;
 
-  if (resolving) {
+  if (resolving || guestLoading || resLoading || ordersLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />

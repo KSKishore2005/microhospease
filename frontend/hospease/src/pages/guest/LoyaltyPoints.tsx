@@ -48,10 +48,18 @@ export default function LoyaltyPoints() {
   const currentTier = TIERS.find((t) => t.name === loyaltyTier) ?? TIERS[0];
   const nextTier = TIERS[TIERS.findIndex((t) => t.name === loyaltyTier) + 1];
 
+  const [prevGuestId, setPrevGuestId] = useState<string | null>(null);
+
+  if (guestId !== prevGuestId) {
+    setPrevGuestId(guestId);
+    if (guestId) {
+      setLoadingPoints(true);
+    }
+  }
+
   // Initialize and load points and redemption history
   useEffect(() => {
     if (guestId) {
-      setLoadingPoints(true);
       const timer = setTimeout(() => {
         // Load points balance
         const savedPoints = localStorage.getItem(`hospease-loyalty-points-${guestId}`);

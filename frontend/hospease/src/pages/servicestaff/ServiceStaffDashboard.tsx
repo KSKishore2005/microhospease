@@ -3,19 +3,29 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
-import Badge, { statusBadge } from '../../components/common/Badge';
+import Badge from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import { formatRelative } from '../../utils/formatters';
 import { useAuthStore } from '../../store/authStore';
 
 export default function ServiceStaffDashboard() {
   const { user } = useAuthStore();
-  const userId = user?.id || (user as any)?.userId;
+  const userId = user?.id;
 
-  const { data: allOrders = [] } = useQuery({
+  const { data: allOrders = [], isLoading } = useQuery({
     queryKey: ['service-orders'],
     queryFn: serviceOrdersApi.getAll,
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   // Filter to show only tasks assigned to this service staff member
   const myOrders = allOrders.filter((o) => String(o.assignedToUserId) === String(userId));

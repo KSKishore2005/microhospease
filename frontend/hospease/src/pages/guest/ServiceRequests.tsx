@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Plus, Bell, CheckCircle2 } from 'lucide-react';
+import { Plus, Bell } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { serviceOrdersApi, type ServiceType } from '../../api/serviceOrders';

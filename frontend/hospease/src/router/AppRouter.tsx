@@ -1,11 +1,9 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/common/Layout';
 
 import LoginPage from '../pages/auth/LoginPage';
 import RegisterPage from '../pages/auth/RegisterPage';
-import ApiTester from '../pages/ApiTester';
 import LandingPage from '../pages/LandingPage';
 import ToastProvider from '../components/common/ToastProvider';
 
@@ -49,16 +47,6 @@ import KPIs from '../pages/reporting/KPIs';
 import ScheduledReports from '../pages/reporting/ScheduledReports';
 import ComplianceExports from '../pages/reporting/ComplianceExports';
 
-function RootRedirect() {
-  const { user, isAuthenticated } = useAuthStore();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  const roleMap: Record<string, string> = {
-    GUEST: '/guest', FRONT_DESK: '/frontdesk', HOUSEKEEPING: '/housekeeping',
-    SERVICE_STAFF: '/servicestaff', FINANCE: '/finance', MANAGER: '/manager',
-    ADMIN: '/admin', REPORTING: '/reporting',
-  };
-  return <Navigate to={roleMap[user!.role] ?? '/login'} replace />;
-}
 
 function Unauthorized() {
   return (
@@ -76,7 +64,6 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
   { path: '/unauthorized', element: <Unauthorized /> },
-  { path: '/api-test', element: <ApiTester /> },   // ← no auth required
 
   // ── Guest Portal ─────────────────────────────────────────────────────────
   {

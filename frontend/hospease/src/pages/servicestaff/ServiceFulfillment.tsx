@@ -24,7 +24,7 @@ export default function ServiceFulfillment() {
   const queryClient = useQueryClient();
   const { customStatuses, setStatus, getStatus } = useWorkflowStore();
   const addToast = useToastStore((s) => s.addToast);
-  const userId = user?.id || (user as any)?.userId;
+  const userId = user?.id;
 
   // My assigned orders
   const { data: myOrders = [], isPending: isOrdersLoading } = useQuery({

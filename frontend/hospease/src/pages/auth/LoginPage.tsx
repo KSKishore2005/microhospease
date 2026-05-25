@@ -1,8 +1,8 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { Eye, EyeOff, ArrowRight, Zap, Shield, BarChart3, Users } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { hospeaseLogo } from '../../components/common/HospEaseLogo';
+import hospeaseLogo from '../../assets/hospease-logo.png';
 
 /* ─── Demo accounts ───────────────────────────────────────── */
 const DEMO_ACCOUNTS = [
@@ -39,9 +39,6 @@ export default function LoginPage() {
   const [error, setError]               = useState('');
   const [loading, setLoading]           = useState(false);
   const [activeDemo, setActiveDemo]     = useState<string | null>(null);
-  const [mounted, setMounted]           = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
 
   if (isAuthenticated && user) {
     return <Navigate to={roleRedirects[user.role] ?? '/guest'} replace />;
@@ -100,7 +97,7 @@ export default function LoginPage() {
 
         <div className="relative flex flex-col justify-between h-full p-12 z-10">
           {/* Logo */}
-          <div className={`flex items-center gap-3 transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
+          <div className="flex items-center gap-3 transition-all duration-700 opacity-100 translate-y-0">
             <div className="relative">
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #c9a227, #f0c040)' }}>
                 <img src={hospeaseLogo} alt="HospEase" className="w-10 h-10 object-contain" />
@@ -114,7 +111,7 @@ export default function LoginPage() {
           </div>
 
           {/* Main content */}
-          <div className={`transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className="transition-all duration-700 delay-200 opacity-100 translate-y-0">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-8" style={{ borderColor: 'rgba(201,162,39,0.3)', background: 'rgba(201,162,39,0.08)' }}>
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#c9a227' }} />
@@ -142,8 +139,8 @@ export default function LoginPage() {
                     borderColor: 'rgba(255,255,255,0.08)',
                     backdropFilter: 'blur(10px)',
                     transitionDelay: `${300 + i * 80}ms`,
-                    opacity: mounted ? 1 : 0,
-                    transform: mounted ? 'translateY(0)' : 'translateY(16px)',
+                    opacity: 1,
+                    transform: 'translateY(0)',
                   }}
                 >
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2.5" style={{ background: 'rgba(201,162,39,0.15)', color: '#c9a227' }}>
@@ -174,7 +171,7 @@ export default function LoginPage() {
           RIGHT PANEL  — form
       ════════════════════════════════════════════════════════ */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12 overflow-y-auto" style={{ background: '#f8fafc' }}>
-        <div className={`w-full max-w-md transition-all duration-700 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+        <div className="w-full max-w-md transition-all duration-700 delay-100 opacity-100 translate-y-0">
 
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">

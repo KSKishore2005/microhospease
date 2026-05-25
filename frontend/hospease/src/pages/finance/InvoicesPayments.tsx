@@ -4,10 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Table from '../../components/common/Table';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
-import { invoicesApi, parseLineItems } from '../../api/invoices';
+import { invoicesApi, parseLineItems, type InvoiceResponseDto } from '../../api/invoices';
 import { paymentsApi } from '../../api/payments';
 import { roomsApi } from '../../api/rooms';
 import type { PaymentMethod } from '../../api/payments';
@@ -18,7 +18,7 @@ type Tab = 'INVOICES' | 'PAYMENTS';
 
 export default function InvoicesPayments() {
   const [tab, setTab] = useState<Tab>('INVOICES');
-  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceResponseDto | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CREDIT_CARD');
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -29,7 +29,7 @@ export default function InvoicesPayments() {
   const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: invoicesApi.getAll });
   const { data: payments = [] } = useQuery({ queryKey: ['payments'], queryFn: paymentsApi.getAll });
   const { data: rooms = [] } = useQuery({ queryKey: ['rooms'], queryFn: roomsApi.getAll });
-  const roomNumberMap = Object.fromEntries(rooms.map((r: any) => [r.roomId, r.number]));
+  const roomNumberMap = Object.fromEntries(rooms.map((r) => [r.roomId, r.number]));
 
   const payInvoiceMutation = useMutation({
     mutationFn: ({ invoiceId, guestId, amount, method }: { invoiceId: string; guestId: string; amount: number; method: PaymentMethod }) =>
@@ -41,8 +41,9 @@ export default function InvoicesPayments() {
       setIsPaymentModalOpen(false);
       setSelectedInvoice(null);
     },
-    onError: (err: any) => {
-      const errMsg = err?.response?.data?.message || err?.message || 'Failed to record payment.';
+    onError: (err: unknown) => {
+      const apiErr = err as { response?: { data?: { message?: string } } };
+      const errMsg = apiErr?.response?.data?.message || (err as Error)?.message || 'Failed to record payment.';
       addToast(errMsg, 'error');
     }
   });
@@ -66,7 +67,7 @@ export default function InvoicesPayments() {
         <div className="flex gap-1.5">
           {row['status'] !== 'PAID' && (
             <Button size="xs" variant="primary" onClick={() => {
-              setSelectedInvoice(row);
+              setSelectedInvoice(row as unknown as InvoiceResponseDto);
               setPaymentAmount(Number(row['balanceDue']));
               setPaymentMethod('CREDIT_CARD');
               setIsPaymentModalOpen(true);
@@ -77,7 +78,7 @@ export default function InvoicesPayments() {
           <Button size="xs" variant="ghost" icon={<Download size={12} />}
             onClick={() => {
               const id = String(row['invoiceId']);
-              const guestName = (row as any).guest?.name || 'Unknown Guest';
+              const guestName = (row as unknown as InvoiceResponseDto).guest?.name || 'Unknown Guest';
               const paymentStatus = String(row['status'] ?? 'UNPAID');
               const totalAmount = Number(row['totalAmount'] ?? 0);
               
@@ -101,13 +102,13 @@ export default function InvoicesPayments() {
                   }
                 }
                 if (Array.isArray(parsed.serviceOrders)) {
-                  parsed.serviceOrders.forEach((so: any) => {
+                  parsed.serviceOrders.forEach((so: { price?: number; serviceType?: string }) => {
                     const price = so.price ?? 0;
                     serviceCharges += price;
                     serviceList.push(`- ${so.serviceType?.replace(/_/g, ' ') || 'Service'}: $${price.toFixed(2)}`);
                   });
                 }
-              } catch (e) {
+              } catch {
                 const items = parseLineItems(row['lineItemsJson'] as string);
                 items.forEach(item => {
                   if (item.description.toLowerCase().includes('room')) {
@@ -252,6 +253,7 @@ Total Amount:    $${totalAmount.toFixed(2)}
               keyField="invoiceId"
               searchable
               searchKeys={['invoiceId', 'guestId']}
+              emptyMessage="No invoices found."
             />
           ) : (
             <Table
@@ -260,6 +262,7 @@ Total Amount:    $${totalAmount.toFixed(2)}
               keyField="paymentId"
               searchable
               searchKeys={['paymentId', 'invoiceId', 'guestId']}
+              emptyMessage="No payments recorded yet."
             />
           )}
         </div>

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { CheckCircle, Play, SkipForward, ClipboardList, Loader2, Clock, Users } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';

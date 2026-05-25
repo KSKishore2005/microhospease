@@ -12,7 +12,6 @@ import { guestsApi } from '../api/guests';
 export function useEffectiveGuestId() {
   const { user, guestId } = useAuthStore();
   const [resolvedId, setResolvedId] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -24,14 +23,24 @@ export function useEffectiveGuestId() {
     && !!user?.email
     && !!user?.name;
 
+  const resolving = needsResolve && !error;
+
+  const [prevNeedsResolve, setPrevNeedsResolve] = useState(needsResolve);
+  if (needsResolve !== prevNeedsResolve) {
+    setPrevNeedsResolve(needsResolve);
+    if (needsResolve) {
+      setError(null);
+    }
+  }
+
   useEffect(() => {
-    if (!needsResolve) return;
+    const email = user?.email;
+    const name = user?.name;
+    if (!needsResolve || !email || !name) return;
     let cancelled = false;
-    setResolving(true);
-    setError(null);
 
     guestsApi
-      .upsert({ name: user!.name, email: user!.email })
+      .upsert({ name, email })
       .then((guest) => {
         if (cancelled) return;
         setResolvedId(guest.guestId);
@@ -63,9 +72,6 @@ export function useEffectiveGuestId() {
           userMsg = msg ?? `Profile setup failed (HTTP ${status}).`;
         }
         setError(userMsg);
-      })
-      .finally(() => {
-        if (!cancelled) setResolving(false);
       });
 
     return () => {

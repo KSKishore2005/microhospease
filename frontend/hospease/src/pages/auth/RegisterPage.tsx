@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
-import { Building2, Eye, EyeOff, UserPlus, CheckCircle } from 'lucide-react';
+import { Building2, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Button from '../../components/common/Button';
 

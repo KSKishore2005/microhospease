@@ -29,5 +29,3 @@ export default function HospEaseLogo({ size = 32, className, glow }: Props) {
     </div>
   );
 }
-
-export { hospeaseLogo };

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
-  ListFilter, CalendarDays, Users, TrendingUp, LogIn,
+  ListFilter, CalendarDays, TrendingUp, LogIn,
   CheckCircle2, LogOut, XCircle, AlertCircle, FileText,
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Table from '../../components/common/Table';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';

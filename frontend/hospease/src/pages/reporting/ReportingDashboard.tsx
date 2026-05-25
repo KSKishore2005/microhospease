@@ -9,10 +9,19 @@ import { invoicesApi } from '../../api/invoices';
 import { formatCurrency, formatPercent } from '../../utils/formatters';
 
 export default function ReportingDashboard() {
-  const { data: kpis = [] }          = useQuery({ queryKey: ['kpis'],           queryFn: kpisApi.getAll });
-  const { data: reports = [] }       = useQuery({ queryKey: ['reports'],        queryFn: reportsApi.getAll });
-  const { data: auditPackages = [] } = useQuery({ queryKey: ['audit-packages'], queryFn: auditPackagesApi.getAll });
-  const { data: invoices = [] }      = useQuery({ queryKey: ['invoices'],       queryFn: invoicesApi.getAll });
+  const { data: kpis = [], isLoading: kpisLoading }          = useQuery({ queryKey: ['kpis'],           queryFn: kpisApi.getAll });
+  const { data: reports = [], isLoading: reportsLoading }       = useQuery({ queryKey: ['reports'],        queryFn: reportsApi.getAll });
+  const { data: auditPackages = [], isLoading: auditLoading } = useQuery({ queryKey: ['audit-packages'], queryFn: auditPackagesApi.getAll });
+  const { data: invoices = [], isLoading: invoicesLoading }      = useQuery({ queryKey: ['invoices'],       queryFn: invoicesApi.getAll });
+
+  if (kpisLoading || reportsLoading || auditLoading || invoicesLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Loading dashboard...</p>
+      </div>
+    );
+  }
 
   const avgKPI  = kpis.length > 0
     ? Math.round((kpis.reduce((s, k) => s + Number(k.currentValue), 0) / kpis.length) * 10) / 10

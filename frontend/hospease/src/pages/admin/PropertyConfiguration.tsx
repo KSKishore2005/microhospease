@@ -10,7 +10,13 @@ import type { RoomResponseDto } from '../../api/rooms';
 import { formatCurrency } from '../../utils/formatters';
 import { useToastStore } from '../../store/toastStore';
 
-const INITIAL_FACILITIES = [
+interface Facility {
+  name: string;
+  hours: string;
+  status: string;
+}
+
+const INITIAL_FACILITIES: Facility[] = [
   { name: 'Main Restaurant', hours: '06:30–23:00', status: 'OPEN' },
   { name: 'Spa & Wellness Center', hours: '08:00–21:00', status: 'OPEN' },
   { name: 'Fitness Center', hours: '05:00–23:00', status: 'OPEN' },
@@ -85,7 +91,7 @@ export default function PropertyConfiguration() {
 
   const handleSaveFacility = () => {
     if (!editingFacility) return;
-    const updated = facilities.map((f: any) => {
+    const updated = facilities.map((f: Facility) => {
       if (f.name === editingFacility.name) {
         return { ...f, hours: facilityForm.hours, status: facilityForm.status };
       }
@@ -182,7 +188,7 @@ export default function PropertyConfiguration() {
       {/* Facility hours */}
       <Card title="Facility Hours & Status">
         <div className="grid sm:grid-cols-2 gap-3">
-          {facilities.map((f: any) => (
+          {facilities.map((f: Facility) => (
             <div key={f.name} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-all bg-white">
               <div>
                 <p className="font-medium text-gray-900 text-sm">{f.name}</p>

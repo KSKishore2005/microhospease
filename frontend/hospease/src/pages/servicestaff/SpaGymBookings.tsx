@@ -3,7 +3,7 @@ import { Plus, UserPlus } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { serviceOrdersApi } from '../../api/serviceOrders';
@@ -67,7 +67,7 @@ export default function SpaGymBookings() {
   });
   const rawBookings = [...spaOrders, ...gymOrders];
   const bookings = (isServiceStaff
-    ? rawBookings.filter((b) => String(b.assignedToUserId) === String(user?.id || (user as any)?.userId))
+    ? rawBookings.filter((b) => String(b.assignedToUserId) === String(user?.id))
     : rawBookings
   ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

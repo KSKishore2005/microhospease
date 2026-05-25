@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Send, Inbox, MessageSquare, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import { serviceOrdersApi } from '../../api/serviceOrders';
 import type { ServiceOrderResponseDto, ServiceOrderStatus } from '../../api/serviceOrders';
@@ -39,13 +39,18 @@ export default function GuestCommunications() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['service-orders'] }),
   });
 
-  useEffect(() => {
-    if (selected) {
-      const stored = localStorage.getItem(`hospease-reply-history-${selected.orderId}`);
-      setReplies(stored ? JSON.parse(stored) : []);
-      setReplyText('');
-    }
-  }, [selected]);
+  const [prevOrderId, setPrevOrderId] = useState<string | null>(null);
+
+  if (selected && selected.orderId !== prevOrderId) {
+    setPrevOrderId(selected.orderId);
+    const stored = localStorage.getItem(`hospease-reply-history-${selected.orderId}`);
+    setReplies(stored ? JSON.parse(stored) : []);
+    setReplyText('');
+  } else if (!selected && prevOrderId !== null) {
+    setPrevOrderId(null);
+    setReplies([]);
+    setReplyText('');
+  }
 
   const handleSendReply = () => {
     if (!selected || !replyText.trim()) return;

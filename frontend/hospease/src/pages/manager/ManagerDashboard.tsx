@@ -1,11 +1,11 @@
-import { Users, TrendingUp, Hotel, Clock, ArrowRight, BarChart3, Target, CheckCircle2, UserCheck, ClipboardList } from 'lucide-react';
+import { Users, TrendingUp, Hotel, Clock, ArrowRight, BarChart3, Target, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import StatCard from '../../components/common/StatCard';
 import Card from '../../components/common/Card';
-import Badge, { statusBadge } from '../../components/common/Badge';
+import Badge from '../../components/common/Badge';
 import { reservationsApi } from '../../api/reservations';
 import { roomsApi } from '../../api/rooms';
 import { staffApi, shiftsApi } from '../../api/staff';
@@ -17,27 +17,19 @@ import { useWorkflowStore } from '../../store/workflowStore';
 import { useToastStore } from '../../store/toastStore';
 
 export default function ManagerDashboard() {
-  const { data: reservations = [] } = useQuery({ queryKey: ['reservations'],    queryFn: reservationsApi.getAll });
-  const { data: rooms = [] }        = useQuery({ queryKey: ['rooms'],            queryFn: roomsApi.getAll });
-  const { data: staff = [] }        = useQuery({ queryKey: ['staff'],            queryFn: staffApi.getAll });
-  const { data: shifts = [] }       = useQuery({ queryKey: ['shifts'],           queryFn: shiftsApi.getAll });
-  const { data: serviceOrders = [] }= useQuery({ queryKey: ['service-orders'],  queryFn: serviceOrdersApi.getAll });
-  const { data: kpis = [] }         = useQuery({ queryKey: ['kpis'],            queryFn: kpisApi.getAll });
-  const { data: allUsers = [] }     = useQuery({ queryKey: ['users'],           queryFn: usersApi.getAll });
+  const { data: reservations = [], isLoading: resLoading } = useQuery({ queryKey: ['reservations'],    queryFn: reservationsApi.getAll });
+  const { data: rooms = [], isLoading: roomsLoading }        = useQuery({ queryKey: ['rooms'],            queryFn: roomsApi.getAll });
+  const { data: staff = [], isLoading: staffLoading }        = useQuery({ queryKey: ['staff'],            queryFn: staffApi.getAll });
+  const { data: shifts = [], isLoading: shiftsLoading }       = useQuery({ queryKey: ['shifts'],           queryFn: shiftsApi.getAll });
+  const { data: serviceOrders = [], isLoading: ordersLoading }= useQuery({ queryKey: ['service-orders'],  queryFn: serviceOrdersApi.getAll });
+  const { data: kpis = [], isLoading: kpisLoading }         = useQuery({ queryKey: ['kpis'],            queryFn: kpisApi.getAll });
+  const { data: allUsers = [], isLoading: usersLoading }     = useQuery({ queryKey: ['users'],           queryFn: usersApi.getAll });
 
   const queryClient = useQueryClient();
   const { customStatuses, setStatus } = useWorkflowStore();
   const addToast = useToastStore((s) => s.addToast);
 
   const [assignMap, setAssignMap] = useState<Record<string, string>>({});
-
-  const serviceStaff = allUsers.filter(
-    (u) =>
-      (u.role === 'RESTAURANT_SERVICE_STAFF' ||
-       u.role === 'HOUSEKEEPING_STAFF' ||
-       u.role === 'FRONT_DESK_STAFF') &&
-      u.status === 'ACTIVE'
-  );
 
   const assignMutation = useMutation({
     mutationFn: ({ orderId, userId }: { orderId: string; userId: string }) =>
@@ -50,10 +42,27 @@ export default function ManagerDashboard() {
     },
   });
 
+  if (resLoading || roomsLoading || staffLoading || shiftsLoading || ordersLoading || kpisLoading || usersLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-3">
+        <div className="w-10 h-10 border-2 border-navy-200 border-t-navy-700 rounded-full animate-spin" />
+        <p className="text-sm text-gray-400 font-medium">Loading dashboard...</p>
+      </div>
+    );
+  }
+
   const handleVerify = (orderId: string) => {
     setStatus(orderId, 'MANAGER_VERIFIED');
     addToast('Task verified — Front Desk can now close it', 'success');
   };
+
+  const serviceStaff = allUsers.filter(
+    (u) =>
+      (u.role === 'RESTAURANT_SERVICE_STAFF' ||
+       u.role === 'HOUSEKEEPING_STAFF' ||
+       u.role === 'FRONT_DESK_STAFF') &&
+      u.status === 'ACTIVE'
+  );
 
   const activeStaffCount = staff.filter((s) => s.status === 'ACTIVE').length;
   const checkedIn     = reservations.filter((r) => r.status === 'CHECKED_IN').length;

@@ -3,7 +3,7 @@ import { Plus, Search, BedDouble, CalendarCheck } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
-import { statusBadge } from '../../components/common/Badge';
+import { statusBadge } from '../../utils/statusBadge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { reservationsApi } from '../../api/reservations';
@@ -238,7 +238,7 @@ export default function Reservations() {
       {/* Summary badges */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'All',        filter: (_s: string) => true,                                color: 'bg-gray-50 text-gray-700 border-gray-200' },
+          { label: 'All',        filter: () => true,                                color: 'bg-gray-50 text-gray-700 border-gray-200' },
           { label: 'Upcoming',   filter: (s: string) => s === 'CONFIRMED' || s === 'PENDING', color: 'bg-blue-50 text-blue-700 border-blue-200' },
           { label: 'Active',     filter: (s: string) => s === 'CHECKED_IN',                   color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
           { label: 'Completed',  filter: (s: string) => s === 'CHECKED_OUT',                  color: 'bg-purple-50 text-purple-700 border-purple-200' },

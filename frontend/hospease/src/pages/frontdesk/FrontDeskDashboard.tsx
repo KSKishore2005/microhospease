@@ -26,6 +26,8 @@ export default function FrontDeskDashboard() {
     onSuccess: (_, orderId) => {
       clearStatus(orderId);
       queryClient.invalidateQueries({ queryKey: ['service-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['financeDashboard'] });
       addToast('Request closed and billed successfully', 'success');
     },
   });

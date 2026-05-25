@@ -55,7 +55,7 @@ export default function FinanceDashboard() {
     .map(([date, revenue]) => {
       // Correlate with service orders created on that day for expenses
       const dayExpenses = serviceOrders
-        .filter((o) => o.status === 'COMPLETED' && o.createdAt.startsWith(date))
+        .filter((o) => o.status === 'COMPLETED' && o.createdAt && o.createdAt.startsWith(date))
         .reduce((s, o) => s + (o.price || 15), 0);
 
       return {

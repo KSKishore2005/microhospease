@@ -9,6 +9,7 @@ import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { invoicesApi, parseLineItems } from '../../api/invoices';
 import { paymentsApi } from '../../api/payments';
+import { roomsApi } from '../../api/rooms';
 import type { PaymentMethod } from '../../api/payments';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 import { useToastStore } from '../../store/toastStore';
@@ -27,6 +28,8 @@ export default function InvoicesPayments() {
 
   const { data: invoices = [] } = useQuery({ queryKey: ['invoices'], queryFn: invoicesApi.getAll });
   const { data: payments = [] } = useQuery({ queryKey: ['payments'], queryFn: paymentsApi.getAll });
+  const { data: rooms = [] } = useQuery({ queryKey: ['rooms'], queryFn: roomsApi.getAll });
+  const roomNumberMap = Object.fromEntries(rooms.map((r: any) => [r.roomId, r.number]));
 
   const payInvoiceMutation = useMutation({
     mutationFn: ({ invoiceId, guestId, amount, method }: { invoiceId: string; guestId: string; amount: number; method: PaymentMethod }) =>
@@ -60,25 +63,86 @@ export default function InvoicesPayments() {
     {
       key: 'invoiceId', label: 'Action',
       render: (_v: unknown, row: Record<string, unknown>) => (
-        row['status'] !== 'PAID' ? (
-          <Button size="xs" variant="ghost" onClick={() => {
-            setSelectedInvoice(row);
-            setPaymentAmount(Number(row['balanceDue']));
-            setPaymentMethod('CREDIT_CARD');
-            setIsPaymentModalOpen(true);
-          }}>
-            Mark Paid
-          </Button>
-        ) : (
+        <div className="flex gap-1.5">
+          {row['status'] !== 'PAID' && (
+            <Button size="xs" variant="primary" onClick={() => {
+              setSelectedInvoice(row);
+              setPaymentAmount(Number(row['balanceDue']));
+              setPaymentMethod('CREDIT_CARD');
+              setIsPaymentModalOpen(true);
+            }}>
+              Mark Paid
+            </Button>
+          )}
           <Button size="xs" variant="ghost" icon={<Download size={12} />}
             onClick={() => {
               const id = String(row['invoiceId']);
-              const guest = String(row['guestId'] ?? '');
-              const total = String(row['totalAmount'] ?? '');
-              const blob = new Blob(
-                [`Invoice: ${id}\nGuest: ${guest}\nTotal: $${total}\nStatus: PAID`],
-                { type: 'text/plain' }
-              );
+              const guestName = (row as any).guest?.name || 'Unknown Guest';
+              const paymentStatus = String(row['status'] ?? 'UNPAID');
+              const totalAmount = Number(row['totalAmount'] ?? 0);
+              
+              const subtotal = totalAmount / 1.12;
+              const tax = totalAmount - subtotal;
+              
+              let roomCharges = 0;
+              let serviceCharges = 0;
+              let roomNumber = 'N/A';
+              const serviceList: string[] = [];
+              
+              try {
+                const parsed = JSON.parse(row['lineItemsJson'] as string);
+                if (parsed.roomCharge) {
+                  roomCharges = parsed.roomCharge.subtotal ?? 0;
+                  const rId = parsed.roomCharge.roomId;
+                  if (rId && roomNumberMap[rId]) {
+                    roomNumber = roomNumberMap[rId];
+                  } else {
+                    roomNumber = parsed.roomCharge.roomNumber ?? String(rId ?? 'N/A');
+                  }
+                }
+                if (Array.isArray(parsed.serviceOrders)) {
+                  parsed.serviceOrders.forEach((so: any) => {
+                    const price = so.price ?? 0;
+                    serviceCharges += price;
+                    serviceList.push(`- ${so.serviceType?.replace(/_/g, ' ') || 'Service'}: $${price.toFixed(2)}`);
+                  });
+                }
+              } catch (e) {
+                const items = parseLineItems(row['lineItemsJson'] as string);
+                items.forEach(item => {
+                  if (item.description.toLowerCase().includes('room')) {
+                    roomCharges += item.total;
+                  } else {
+                    serviceCharges += item.total;
+                    serviceList.push(`- ${item.description}: $${item.total.toFixed(2)}`);
+                  }
+                });
+              }
+
+              const breakdownText = serviceList.length > 0 
+                ? serviceList.join('\n') 
+                : '- No additional service charges';
+
+              const txt = `========================================
+HOSPEASE HOTEL INVOICE
+========================================
+Invoice ID:     ${id}
+Guest Name:     ${guestName}
+Room Number:    ${roomNumber}
+Payment Status: ${paymentStatus}
+----------------------------------------
+Room Charges:    $${roomCharges.toFixed(2)}
+
+Service Charges:
+${breakdownText}
+Total Services:  $${serviceCharges.toFixed(2)}
+
+Taxes (12%):     $${tax.toFixed(2)}
+----------------------------------------
+Total Amount:    $${totalAmount.toFixed(2)}
+========================================`;
+
+              const blob = new Blob([txt], { type: 'text/plain' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
@@ -88,7 +152,7 @@ export default function InvoicesPayments() {
             }}>
             Export
           </Button>
-        )
+        </div>
       ),
     },
   ];

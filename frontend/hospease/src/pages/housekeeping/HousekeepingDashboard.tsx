@@ -57,7 +57,7 @@ export default function HousekeepingDashboard() {
   const progress  = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   const activeRoomsToClean = useMemo(() => {
-    return rooms
+    const list = rooms
       .map((r) => {
         let displayStatus = 'CLEAN';
         if (r.status === 'OCCUPIED') displayStatus = 'OCCUPIED';
@@ -70,7 +70,14 @@ export default function HousekeepingDashboard() {
         return { ...r, displayStatus };
       })
       .filter((r) => r.displayStatus === 'DIRTY' || r.displayStatus === 'CLEANING');
-  }, [rooms, roomFlags]);
+
+    const isHousekeeper = user?.role === 'HOUSEKEEPING';
+    if (isHousekeeper) {
+      const assignedRoomIds = new Set(tasks.map((t) => String(t.roomId)));
+      return list.filter((r) => assignedRoomIds.has(String(r.roomId)));
+    }
+    return list;
+  }, [rooms, roomFlags, user, tasks]);
 
   return (
     <div className="space-y-6 max-w-7xl">

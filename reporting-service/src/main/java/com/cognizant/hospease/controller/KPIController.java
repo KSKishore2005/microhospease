@@ -38,32 +38,32 @@ public class KPIController {
     }
 
     @PostMapping
-    @RoleRequired({"MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"MANAGER", "ADMINISTRATOR","AUDITOR"})
     public ResponseEntity<KPIResponseDto> createKPI(@Valid @RequestBody KPIRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(kpiService.createKPI(dto));
     }
 
     @PutMapping("/{id}")
-    @RoleRequired({"MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"MANAGER", "ADMINISTRATOR","AUDITOR"})
     public ResponseEntity<KPIResponseDto> updateKPI(@PathVariable Long id,
                                                     @Valid @RequestBody KPIRequestDto dto) {
         return ResponseEntity.ok(kpiService.updateKPI(id, dto));
     }
 
     @PostMapping("/{id}/calculate-occupancy")
-    @RoleRequired({"MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"MANAGER", "ADMINISTRATOR","AUDITOR"})
     public ResponseEntity<KPIResponseDto> triggerOccupancyCalc(@PathVariable Long id) {
         return ResponseEntity.ok(kpiService.calculateOccupancyRate(id));
     }
 
     @PostMapping("/{id}/calculate-revenue")
-    @RoleRequired({"MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"MANAGER", "ADMINISTRATOR","AUDITOR"})
     public ResponseEntity<KPIResponseDto> triggerRevenueCalc(@PathVariable Long id) {
         return ResponseEntity.ok(kpiService.calculateRevenue(id));
     }
 
     @PostMapping("/{id}/calculate-collection-rate")
-    @RoleRequired({"MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"MANAGER", "ADMINISTRATOR","AUDITOR"})
     public ResponseEntity<KPIResponseDto> triggerCollectionCalc(@PathVariable Long id) {
         return ResponseEntity.ok(kpiService.calculatePaymentCollectionRate(id));
     }

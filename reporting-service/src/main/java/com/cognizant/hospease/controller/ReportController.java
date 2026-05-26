@@ -57,13 +57,13 @@ public class ReportController {
     }
 
     @PostMapping
-    @RoleRequired({"MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"MANAGER", "ADMINISTRATOR", "AUDITOR"})
     public ResponseEntity<ReportResponseDto> createReport(@Valid @RequestBody ReportRequestDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(reportService.createReport(dto));
     }
 
     @PutMapping("/{id}")
-    @RoleRequired({"MANAGER", "ADMINISTRATOR"})
+    @RoleRequired({"MANAGER", "ADMINISTRATOR", "AUDITOR"})
     public ResponseEntity<ReportResponseDto> updateReport(
             @PathVariable Long id, @Valid @RequestBody ReportRequestDto dto) {
         return ResponseEntity.ok(reportService.updateReport(id, dto));

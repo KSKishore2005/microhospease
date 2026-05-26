@@ -25,14 +25,22 @@ export const ROLE_MAP_REVERSE: Record<UserRole, string> = {
   GUEST: 'GUEST',
 };
 
+// Backend serialises with @JsonProperty("user_id") and @JsonProperty("token_type"),
+// so the actual JSON uses snake_case for those fields. Declared as optional on
+// both shapes so authStore can tolerate either casing — never trust a single
+// key. See authStore.resolveUserId() for the resolution.
 export interface AuthResponse {
   token: string;
-  tokenType: string;
-  userId: string;
+  tokenType?: string;
+  token_type?: string;
+  userId?: string | number;
+  user_id?: string | number;
+  id?: string | number;
   name: string;
   email: string;
   role: string;
-  expiresIn: number;
+  expiresIn?: number;
+  expires_in?: number;
 }
 
 export interface RegisterRequest {

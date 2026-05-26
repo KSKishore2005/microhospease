@@ -1,8 +1,32 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '../types';
-import { authApi, ROLE_MAP } from '../api/auth';
+import { authApi, ROLE_MAP, type AuthResponse } from '../api/auth';
 import { guestsApi } from '../api/guests';
+
+/**
+ * The backend's AuthResponse uses @JsonProperty("user_id"), so the actual JSON
+ * field is snake_case. Plus historic versions sometimes returned `id`. Try all
+ * three keys and validate the result is a non-empty, non-"undefined" string.
+ *
+ * Returning null (instead of "undefined" or "null") lets callers detect the
+ * failure cleanly — never persist a corrupt id like "undefined" that satisfies
+ * !!staffUserId checks and then 400s every assignee API call.
+ */
+function resolveUserId(data: AuthResponse): string | null {
+  const candidates = [data.userId, data.user_id, data.id];
+  for (const c of candidates) {
+    if (c === undefined || c === null) continue;
+    const s = String(c).trim();
+    if (s === '' || s === 'undefined' || s === 'null' || s === 'NaN') continue;
+    return s;
+  }
+  // Diagnostic: if the response shape changes again, we want a clear hint
+  // in the console instead of a silent "undefined" cascade.
+  // eslint-disable-next-line no-console
+  console.warn('[authStore] login/register response had no usable user id:', data);
+  return null;
+}
 
 interface AuthState {
   user: User | null;
@@ -43,7 +67,13 @@ export const useAuthStore = create<AuthState>()(
           const data = await authApi.login(email, password);
           const frontendRole = ROLE_MAP[data.role] ?? 'GUEST';
 
-          const resolvedId = data.userId;
+          const resolvedId = resolveUserId(data);
+          if (!resolvedId) {
+            return {
+              success: false,
+              error: 'Login succeeded but the server did not return a valid user id. Please contact support.',
+            };
+          }
           const user: User = {
             id: resolvedId,
             name: data.name,
@@ -83,7 +113,13 @@ export const useAuthStore = create<AuthState>()(
         try {
           const data = await authApi.register({ name, email, phone, password, role: 'GUEST' });
           const frontendRole = ROLE_MAP[data.role] ?? 'GUEST';
-          const resolvedId = data.userId;
+          const resolvedId = resolveUserId(data);
+          if (!resolvedId) {
+            return {
+              success: false,
+              error: 'Registration succeeded but the server did not return a valid user id. Please contact support.',
+            };
+          }
           const user: User = {
             id: resolvedId,
             name: data.name,

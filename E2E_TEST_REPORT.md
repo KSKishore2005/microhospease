@@ -318,6 +318,78 @@ Run from your terminal with `curl` or Postman against the **API Gateway** (`http
 
 ---
 
+## 6.5 Comprehensive Static Audit — Backend + Frontend
+
+A full static analysis pass was performed on **2026-05-26** across all 7 backend services and the entire frontend. Bugs are grouped by severity. None of these are fixed yet — they're the audit findings on top of the 16 bugs already resolved.
+
+### 🔴 CRITICAL — Block release
+
+| # | Component | File | Symptom | Root cause |
+|---|---|---|---|---|
+| C1 | finance-service | [`InvoiceService.java:217-238`](finance-service/src/main/java/com/cognizant/billing/service/InvoiceService.java) | Race condition on concurrent invoice status flips | `markAsPaid` reads status (line 218), checks (222), writes (237) without lock — two threads can both pass the check. `PaymentService.createPayment` uses `findByIdForUpdate` but `InvoiceService` reads do not |
+| C2 | service-order-service | [`ServiceOrderService.java:301-304`](service-order-service/src/main/java/com/cognizant/services_service/service/ServiceOrderService.java) | Status state machine allows `PENDING → COMPLETED` directly | Switch case allows ANY state → COMPLETED, bypassing IN_PROGRESS; breaks the operational workflow contract |
+| C3 | reporting-service / seed data | `seed_data.sql:79` | Seed data inserts staff with `role='HOUSEKEEPER'` — an obsolete enum value | After UserRole was renamed to `HOUSEKEEPING_STAFF`, seed data never updated. On every DB restore, GET /api/staff 500s on deserialization (this is exactly the bug we hit live on 2026-05-25) |
+
+### 🟠 HIGH — Fix before next sprint
+
+| # | Component | File | Symptom | Root cause |
+|---|---|---|---|---|
+| H1 | finance-service | [`InvoiceService.java:322-390`](finance-service/src/main/java/com/cognizant/billing/service/InvoiceService.java) | `GET /api/invoices` has side effects — `enrich()` calls `recalculateInvoiceIfUnpaid()` which writes to DB during a read | Violates HTTP semantics; causes 500s on transient network blips during innocuous list calls |
+| H2 | finance-service | [`PaymentService.java:90-92`, `:159-174`](finance-service/src/main/java/com/cognizant/billing/service/PaymentService.java) | NPE on `invoice.getTotalAmount()` if entity field is somehow null | No defensive null-check before BigDecimal arithmetic in `createPayment` and `refundPayment` |
+| H3 | api-gateway | `SecurityConfig.java:23` | `.anyExchange().permitAll()` bypasses route-level Authentication filter | All gateway routes effectively unauthenticated; only the per-route `Authentication` filter (a custom one) enforces JWT. If that filter is misconfigured on a route, the endpoint is fully open |
+| H4 | guest-reservation-service | [`ReservationService.java:282`](guest-reservation-service/src/main/java/com/cognizant/guest_reservation_service/reservation/service/ReservationService.java) | Reservation state machine allows `CHECKED_OUT → CANCELLED` (terminal state transition) | Inconsistent state-machine implementation; documented as terminal but code allows the transition |
+| H5 | reporting-service | `RoomServiceClientFallback.java`, `FinanceClientFallback.java` | Circuit-breaker fallback returns empty list, masking real downstream failures | KPI calculation reports 0 % occupancy / 0 % collection during outages, undetectable from the UI |
+| H6 | frontend | [`pages/guest/GuestDashboard.tsx:148, 179`](frontend/hospease/src/pages/guest/GuestDashboard.tsx); [`pages/guest/Reservations.tsx:293, 348`](frontend/hospease/src/pages/guest/Reservations.tsx) | `.replace('_', ' ')` only replaces the **first** underscore | Multi-underscore enum values display as `ROOM_SERVICE` (with one underscore still) or `FOOD AND_BEVERAGES`. Cosmetic but everywhere |
+| H7 | frontend | [`pages/guest/LoyaltyPoints.tsx:75`](frontend/hospease/src/pages/guest/LoyaltyPoints.tsx); [`pages/frontdesk/GuestCommunications.tsx:47`](frontend/hospease/src/pages/frontdesk/GuestCommunications.tsx) | `JSON.parse(localStorage.getItem(...))` not wrapped in `try/catch` | Corrupt or manually-edited localStorage crashes the entire page with `SyntaxError` |
+| H8 | reporting-service | Multiple files — all uses of `seed_data.sql` | Seed data uses deprecated short role values (`STAFF`, `MANAGER`, `HOUSEKEEPER`) instead of full enum names | On a clean rebuild, dev DB inherits inconsistent data. This is the root cause of bug #11 from this session |
+
+### 🟡 MEDIUM — Polish/correctness improvements
+
+| # | Component | File | Symptom | Root cause |
+|---|---|---|---|---|
+| M1 | finance-service | [`PaymentService.java:115-122`](finance-service/src/main/java/com/cognizant/billing/service/PaymentService.java) | BigDecimal scale drift can cause `compareTo()` to mis-fire | `newTotalPaid = alreadyPaid.add(payment.getAmount())` doesn't normalize scale. Earlier code uses `.setScale(2, HALF_UP)` consistently but this branch doesn't |
+| M2 | guest-reservation-service | [`ReservationService.java:250-257`](guest-reservation-service/src/main/java/com/cognizant/guest_reservation_service/reservation/service/ReservationService.java) | Same-day check-in/check-out is allowed | Validation uses `.isAfter()` instead of `.isAfterOrEqual()`. Allows 0-night reservations that confuse billing |
+| M3 | reporting-service | `ReportingHealthIndicator.java:17-31` | `/actuator/health` always reports `UP` | Indicator only checks local filesystem; ignores DB connectivity, circuit-breaker state, downstream health. K8s liveness probe would never kill a broken pod |
+| M4 | reporting-service | `KPIService.java:133-160` | Rate-limiter fallback re-throws instead of returning degraded KPI | Under burst load, frontend gets 500 instead of last-known cached value |
+| M5 | reporting-service | `ReportScope.java:5-6` | Enum contains both `FINANCIAL` and a legacy `FINANCE` alias | Reports created with one can't be queried by the other depending on caller; subtle data-fragmentation bug |
+| M6 | guest-reservation-service | `JwtFilter.java:49` vs `UniversalRoleInterceptor.java:44` | `ROLE_` prefix handling is inconsistent | Filter adds `ROLE_` prefix, interceptor strips it. Works today only because the JWT role claim happens not to contain `ROLE_` |
+| M7 | user-service | `UserService.java:77-87` | `assignRole(id, role)` calls `.toUpperCase()` but doesn't validate against the `UserRole` enum values | Admin can set any garbage string as a user's role; that user then becomes effectively a `GUEST` after `ROLE_MAP` fallback in frontend |
+| M8 | frontend | [`pages/finance/InvoicesPayments.tsx:94`](frontend/hospease/src/pages/finance/InvoicesPayments.tsx) | `JSON.parse(lineItemsJson)` wrapped in `try/catch` but fallback path on lines 111-121 still assumes valid structure | Partial data corruption silently drops line items |
+| M9 | frontend | [`pages/reporting/ComplianceExports.tsx:42`](frontend/hospease/src/pages/reporting/ComplianceExports.tsx); [`pages/guest/LoyaltyPoints.tsx:65-75`](frontend/hospease/src/pages/guest/LoyaltyPoints.tsx) | `JSON.parse(localStorage)` without error handling | Same crash pattern as H7 |
+| M10 | frontend | [`pages/finance/InvoicesPayments.tsx:364`](frontend/hospease/src/pages/finance/InvoicesPayments.tsx) | Empty payment-amount input sends `0` (via `parseFloat('') \|\| 0`), allowing zero-amount payments | Backend already rejects with 400, but the frontend should prevent it for clean UX |
+| M11 | finance-service | [`InvoiceService.java:365`](finance-service/src/main/java/com/cognizant/billing/service/InvoiceService.java) | Over-defensive null-check on a `@Column(nullable=false)` field | Hides real constraint violations and wastes cycles |
+
+### 🟢 LOW — Cosmetic / future-proofing
+
+| # | Component | File | Symptom | Root cause |
+|---|---|---|---|---|
+| L1 | guest-reservation-service | `client/*.java` | Feign clients have no `timeout`, no `@FeignClient` retry, no fallback implementation | Slow downstream services hang the reservation flow indefinitely |
+| L2 | reporting-service | `staff.role` column width | Currently `VARCHAR(40)` fits all existing enum values, but if a longer enum value is added later, the truncation bug recurs | No automated test that all `UserRole.values()` fit the column |
+| L3 | frontend | [`pages/guest/Reservations.tsx:77`](frontend/hospease/src/pages/guest/Reservations.tsx) | `specialRequests: special \|\| undefined` sends explicit `undefined` in payload | JSON.stringify drops it, so harmless, but inconsistent with other pages |
+| L4 | service-order-service | `ServiceOrderService.java:259` | `createOrder` allows initial status to be `COMPLETED` if the caller specifies it | Frontend doesn't currently do this, but future callers could create pre-completed orders bypassing the kanban |
+
+### Repeating cross-cutting patterns
+
+Across all the bugs found this session — both the 16 already fixed and the 24 listed above — three patterns dominate:
+
+1. **JSON field-name mismatches** — `@JsonProperty("user_id")` in Java vs `userId` in TS interface (bug #17 of this session, the live "undefined user.id" issue). Every Java DTO that uses `@JsonProperty` for snake_case should have a matching TS interface that declares BOTH names.
+
+2. **Stale DB constraints after entity changes** — `ddl-auto=update` never widens or relaxes existing column constraints. Required pattern: every entity change that loosens a constraint needs a corresponding idempotent `ALTER TABLE` in `schema.sql`.
+
+3. **Front-vs-back role naming** — Comparing `user.role` (frontend role via `ROLE_MAP`) against backend role names, or vice versa. Add lint / runtime warning when a comparison crosses the boundary.
+
+### HTTP error fingerprint (what status codes mean in this codebase)
+
+| Status | Most-common cause | First place to check |
+|---|---|---|
+| **400** | Invalid request body, invalid enum value, validation failure | Backend service console — look for `BadRequestException` |
+| **401** | JWT missing / expired / signature mismatch | api-gateway logs; JWT secret in all services' `application.yml` matches |
+| **403** | Role not in `@RoleRequired` list for that endpoint | Check the endpoint's `@RoleRequired({...})` and confirm the user's actual backend role is in the list |
+| **404** | Entity not found (`ResourceNotFoundException`) OR endpoint misrouted | Confirm the path exists, then check the entity actually exists in DB |
+| **500** | Hibernate session poisoning, NPE on unexpected null, constraint violation that wasn't caught | Service console for the **actual** stack trace. The frontend's surface message is rarely the root cause |
+
+---
+
 ## 7. 10-Minute Smoke Test
 
 After any code change, run this rapid sanity-check before doing a full E2E:

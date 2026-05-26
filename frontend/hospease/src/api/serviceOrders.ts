@@ -76,8 +76,15 @@ export const serviceOrdersApi = {
       `/service-orders/${id}/status`, null, { params: { status } }
     ).then(r => r.data),
 
-  getByAssignee: (userId: string) =>
-    apiClient.get<ServiceOrderResponseDto[]>(`/service-orders/assignee/${userId}`).then(r => r.data),
+  getByAssignee: (userId: string) => {
+    // Hard rail-guard: refuse to build a URL with a corrupt id. Avoids the
+    // /service-orders/assignee/undefined → 400 storm we used to see when the
+    // auth store persisted "undefined" as a string.
+    if (!userId || userId === 'undefined' || userId === 'null' || userId === 'NaN') {
+      return Promise.reject(new Error(`Invalid userId for getByAssignee: ${userId}`));
+    }
+    return apiClient.get<ServiceOrderResponseDto[]>(`/service-orders/assignee/${userId}`).then(r => r.data);
+  },
 
   getQueue: () =>
     apiClient.get<ServiceOrderResponseDto[]>('/service-orders/queue').then(r => r.data),

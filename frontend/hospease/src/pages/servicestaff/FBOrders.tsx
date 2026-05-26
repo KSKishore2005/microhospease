@@ -45,46 +45,101 @@ export default function FBOrders() {
   });
 
   const queryClient = useQueryClient();
+  // Belt-and-braces: in addition to checking !!staffUserId in the `enabled`
+  // flag below, we explicitly reject corrupt values like the literal string
+  // "undefined" or "null" that older auth-store versions could persist.
+  // Without this, the assignee endpoint would receive /assignee/undefined and
+  // 400 on every render.
+  const rawStaffId = user?.id;
+  const staffUserId =
+    rawStaffId &&
+    rawStaffId !== 'undefined' &&
+    rawStaffId !== 'null' &&
+    rawStaffId !== 'NaN'
+      ? rawStaffId
+      : undefined;
 
-  const { data: orders = [] } = useQuery({
-    queryKey: ['service-orders', 'RESTAURANT'],
-    queryFn: () => serviceOrdersApi.getByType('RESTAURANT'),
+  // For a service-staff user, fetch by assignee so we see EVERY order routed to
+  // them — regardless of service type. The page used to query only by
+  // serviceType=RESTAURANT and serviceType=ROOM_SERVICE, which silently dropped
+  // any order the manager dispatched as FOOD_AND_BEVERAGES, SPA, GYM, or
+  // LAUNDRY. Switching to the assignee endpoint guarantees the staff's work
+  // queue matches what the manager actually assigned.
+  const { data: assignedOrders = [] } = useQuery({
+    queryKey: ['service-orders', 'assignee', staffUserId],
+    queryFn: () => serviceOrdersApi.getByAssignee(staffUserId!),
+    enabled: isServiceStaff && !!staffUserId,
   });
 
-  // Also fetch room service orders
+  // Manager / admin browsing this page (not the assigned-staff case) still
+  // sees the F&B-context orders by type. Include FOOD_AND_BEVERAGES alongside
+  // the legacy RESTAURANT enum and ROOM_SERVICE.
+  const { data: restaurantOrders = [] } = useQuery({
+    queryKey: ['service-orders', 'RESTAURANT'],
+    queryFn: () => serviceOrdersApi.getByType('RESTAURANT'),
+    enabled: !isServiceStaff,
+  });
+  const { data: fbOrders = [] } = useQuery({
+    queryKey: ['service-orders', 'FOOD_AND_BEVERAGES'],
+    queryFn: () => serviceOrdersApi.getByType('FOOD_AND_BEVERAGES'),
+    enabled: !isServiceStaff,
+  });
   const { data: roomServiceOrders = [] } = useQuery({
     queryKey: ['service-orders', 'ROOM_SERVICE'],
     queryFn: () => serviceOrdersApi.getByType('ROOM_SERVICE'),
+    enabled: !isServiceStaff,
   });
 
-  const rawAllOrders = [...orders, ...roomServiceOrders];
-  const allOrders = (isServiceStaff
-    ? rawAllOrders.filter((o) => String(o.assignedToUserId) === String(user?.id))
-    : rawAllOrders
-  ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // Deduplicate by orderId in case an order ever matches multiple buckets.
+  const allOrders = (() => {
+    const source = isServiceStaff
+      ? assignedOrders
+      : [...restaurantOrders, ...fbOrders, ...roomServiceOrders];
+    const seen = new Set<string>();
+    return source
+      .filter((o) => {
+        const key = String(o.orderId);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  })();
 
-  // Fetch reservations for picker
+  // Fetch reservations only when the New Order modal is open AND the user has
+  // permission to read all reservations. Service Staff (RESTAURANT_SERVICE_STAFF
+  // → frontend role SERVICE_STAFF) does NOT have permission for this endpoint,
+  // so unconditionally calling it produced a 403 storm on every render.
+  const canListReservations = !isServiceStaff;
   const { data: allReservations = [] } = useQuery({
     queryKey: ['reservations'],
     queryFn: reservationsApi.getAll,
+    enabled: showNew && canListReservations,
   });
   const activeReservations = allReservations.filter(
     (r) => r.status === 'CHECKED_IN' || r.status === 'CONFIRMED'
   );
 
+  // Invalidate every query that could hold this order so the kanban refreshes
+  // immediately after a status change or new order — regardless of whether the
+  // current viewer is a service staff (assignee query) or a manager (type
+  // queries).
+  const invalidateOrderCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['service-orders', 'assignee', staffUserId] });
+    queryClient.invalidateQueries({ queryKey: ['service-orders', 'RESTAURANT'] });
+    queryClient.invalidateQueries({ queryKey: ['service-orders', 'FOOD_AND_BEVERAGES'] });
+    queryClient.invalidateQueries({ queryKey: ['service-orders', 'ROOM_SERVICE'] });
+  };
+
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: ServiceOrderStatus }) => serviceOrdersApi.updateStatus(id, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['service-orders', 'RESTAURANT'] });
-      queryClient.invalidateQueries({ queryKey: ['service-orders', 'ROOM_SERVICE'] });
-    },
+    onSuccess: () => invalidateOrderCaches(),
   });
 
   const createMutation = useMutation({
     mutationFn: (payload: Parameters<typeof serviceOrdersApi.create>[0]) => serviceOrdersApi.create(payload),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['service-orders', 'RESTAURANT'] });
-      queryClient.invalidateQueries({ queryKey: ['service-orders', 'ROOM_SERVICE'] });
+      invalidateOrderCaches();
       setShowNew(false);
       setForm({ serviceType: 'RESTAURANT', reservationId: '', description: '', price: '' });
     },

@@ -12,12 +12,15 @@ import { formatCurrency, formatRelative } from '../../utils/formatters';
 import { useAuthStore } from '../../store/authStore';
 
 
+// Kanban flow: Pending → In Progress → Ready → Completed.
+// Maps each DB status to the next status the "advance" button should set.
+// CONFIRMED is shown as "Ready" in the UI.
 const STATUS_FLOW: Record<string, string | null> = {
-  PENDING: 'IN_PROGRESS',
-  IN_PROGRESS: 'COMPLETED',
-  CONFIRMED: 'IN_PROGRESS',
-  COMPLETED: null,
-  CANCELLED: null,
+  PENDING:     'IN_PROGRESS',  // Pending     → In Progress
+  IN_PROGRESS: 'CONFIRMED',    // In Progress → Ready
+  CONFIRMED:   'COMPLETED',    // Ready       → Completed
+  COMPLETED:   null,           // terminal
+  CANCELLED:   null,           // terminal
 };
 
 const statusIcons: Record<string, React.ReactNode> = {

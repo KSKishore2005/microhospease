@@ -225,24 +225,30 @@ public class ServiceOrderService {
                     "Cannot assign an order in terminal status '" + existing.getStatus() + "'.");
         }
         existing.setAssignedToUserId(userId);
-        if (existing.getStatus() == ServiceOrderStatus.PENDING) {
-            existing.setStatus(ServiceOrderStatus.CONFIRMED);
-        }
+        // Do NOT auto-promote PENDING → CONFIRMED on assignment. The kanban
+        // flow is Pending (PENDING) → In Progress (IN_PROGRESS) → Ready
+        // (CONFIRMED) → Completed (COMPLETED). Assignment only sets the
+        // assignee; the staff member is responsible for advancing the status
+        // when they actually start work.
         return enrich(repository.save(existing));
     }
 
     /**
      * Convenience: assign to the staff member AND move to IN_PROGRESS in one call.
      * Used by the "Accept & Start" button in the service-fulfillment UI.
+     *
+     * With the kanban flow Pending → In Progress → Ready (CONFIRMED) → Completed,
+     * only PENDING orders are eligible for acceptance — CONFIRMED now means
+     * "Ready" (work done, awaiting completion) and going back to IN_PROGRESS
+     * would be a backwards transition.
      */
     public ServiceOrderResponseDto acceptOrder(Long id, Long userId) {
         log.info("Service-staff userId={} accepting order id={}", userId, id);
         ServiceOrder existing = findEntityById(id);
 
-        if (existing.getStatus() != ServiceOrderStatus.PENDING
-                && existing.getStatus() != ServiceOrderStatus.CONFIRMED) {
+        if (existing.getStatus() != ServiceOrderStatus.PENDING) {
             throw new BadRequestException(
-                    "Only PENDING or CONFIRMED orders can be accepted; current: " + existing.getStatus());
+                    "Only PENDING orders can be accepted; current: " + existing.getStatus());
         }
         existing.setAssignedToUserId(userId);
         validateStatusTransition(existing.getStatus(), ServiceOrderStatus.IN_PROGRESS);
@@ -283,14 +289,18 @@ public class ServiceOrderService {
     }
 
     /**
-     * Validates status transitions to prevent illegal moves like COMPLETED → PENDING.
+     * Validates status transitions to enforce the linear kanban flow:
      * <pre>
-     *   PENDING     → CONFIRMED  | IN_PROGRESS | CANCELLED
-     *   CONFIRMED   → IN_PROGRESS | CANCELLED
-     *   IN_PROGRESS → COMPLETED  | CANCELLED
+     *   PENDING     → IN_PROGRESS | CANCELLED
+     *   IN_PROGRESS → CONFIRMED   | CANCELLED
+     *   CONFIRMED   → COMPLETED   | CANCELLED
      *   COMPLETED   → (terminal)
      *   CANCELLED   → (terminal)
      * </pre>
+     * In UI terms: Pending → In Progress → Ready (CONFIRMED) → Completed.
+     * The previous version allowed direct PENDING → CONFIRMED (which let
+     * assignment skip In Progress) and CONFIRMED → IN_PROGRESS (a backwards
+     * move). Both are now blocked to keep the flow strictly forward.
      */
     private void validateStatusTransition(ServiceOrderStatus current, ServiceOrderStatus next) {
         if (current == next) {
@@ -298,14 +308,12 @@ public class ServiceOrderService {
             return;
         }
         boolean valid = switch (current) {
-            case PENDING     -> next == ServiceOrderStatus.CONFIRMED
-                                || next == ServiceOrderStatus.IN_PROGRESS
-                                || next == ServiceOrderStatus.COMPLETED
+            case PENDING     -> next == ServiceOrderStatus.IN_PROGRESS
                                 || next == ServiceOrderStatus.CANCELLED;
-            case CONFIRMED   -> next == ServiceOrderStatus.IN_PROGRESS
-                                || next == ServiceOrderStatus.COMPLETED
+            case IN_PROGRESS -> next == ServiceOrderStatus.CONFIRMED
                                 || next == ServiceOrderStatus.CANCELLED;
-            case IN_PROGRESS -> next == ServiceOrderStatus.COMPLETED   || next == ServiceOrderStatus.CANCELLED;
+            case CONFIRMED   -> next == ServiceOrderStatus.COMPLETED
+                                || next == ServiceOrderStatus.CANCELLED;
             case COMPLETED, CANCELLED -> false;
         };
         if (!valid) {

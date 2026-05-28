@@ -74,6 +74,7 @@ export default function SpaGymBookings() {
   const { data: allReservations = [] } = useQuery({
     queryKey: ['reservations'],
     queryFn: reservationsApi.getAll,
+    enabled: !isServiceStaff,
   });
   const activeReservations = allReservations.filter(
     (r) => r.status === 'CHECKED_IN' || r.status === 'CONFIRMED'

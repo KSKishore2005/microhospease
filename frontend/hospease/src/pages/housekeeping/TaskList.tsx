@@ -40,6 +40,7 @@ export default function TaskList() {
   const { data: users = [] } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.getAll,
+    enabled: isManagerView,
   });
 
   const userMap = useMemo(() => new Map(users.map((u) => [String(u.userId), u.name])), [users]);

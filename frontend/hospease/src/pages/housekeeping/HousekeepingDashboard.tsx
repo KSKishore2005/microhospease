@@ -15,9 +15,10 @@ import { useRoomStatusStore } from '../../store/roomStatusStore';
 
 export default function HousekeepingDashboard() {
   const { user } = useAuthStore();
+  const isManagerView = user?.role === 'MANAGER' || user?.role === 'ADMIN';
   const { data: allTasks = [], isLoading: tasksLoading } = useQuery({ queryKey: ['housekeeping'], queryFn: housekeepingApi.getAll });
   const { data: rooms = [], isLoading: roomsLoading }  = useQuery({ queryKey: ['rooms'],                     queryFn: roomsApi.getAll });
-  const { data: users = [], isLoading: usersLoading }  = useQuery({ queryKey: ['users'],                     queryFn: usersApi.getAll });
+  const { data: users = [], isLoading: usersLoading }  = useQuery({ queryKey: ['users'],                     queryFn: usersApi.getAll, enabled: isManagerView });
   const { roomFlags } = useRoomStatusStore();
 
   const userMap = useMemo(() => new Map(users.map((u) => [String(u.userId), u.name])), [users]);

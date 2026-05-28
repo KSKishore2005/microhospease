@@ -15,7 +15,7 @@ const roleInfo: Record<string, { label: string; color: string; bg: string }> = {
   HOUSEKEEPING:  { label: 'Housekeeping',    color: 'text-amber-700',   bg: 'bg-amber-50   ring-1 ring-amber-200' },
   SERVICE_STAFF: { label: 'Service Staff',   color: 'text-orange-700',  bg: 'bg-orange-50  ring-1 ring-orange-200' },
   FINANCE:       { label: 'Finance',         color: 'text-teal-700',    bg: 'bg-teal-50    ring-1 ring-teal-200' },
-  REPORTING:     { label: 'Analytics',       color: 'text-indigo-700',  bg: 'bg-indigo-50  ring-1 ring-indigo-200' },
+  REPORTING:     { label: 'Reporting',       color: 'text-indigo-700',  bg: 'bg-indigo-50  ring-1 ring-indigo-200' },
   GUEST:         { label: 'Guest',           color: 'text-yellow-700',  bg: 'bg-yellow-50  ring-1 ring-yellow-200' },
 };
 
@@ -33,6 +33,41 @@ const notifTypeIcons: Record<string, string> = {
   system: '⚙️',
   task: '📋',
   housekeeping: '🧹',
+};
+
+/**
+ * Notification type × frontend role → destination route. Centralises what used
+ * to be a chain of inline `if (user.role === 'X' || ...) navigate(...)` blocks
+ * scattered through the click handler, so adding a new role/type only requires
+ * one map entry. Returns undefined if no route is appropriate.
+ */
+const NOTIF_ROUTES: Record<string, Partial<Record<string, string>>> = {
+  booking: {
+    GUEST:       '/guest/reservations',
+    FRONT_DESK:  '/frontdesk/reservations',
+    MANAGER:     '/frontdesk/reservations',
+    ADMIN:       '/frontdesk/reservations',
+  },
+  service: {
+    GUEST:       '/guest/service-requests',
+    FRONT_DESK:  '/frontdesk/communications',
+    MANAGER:     '/frontdesk/communications',
+    ADMIN:       '/frontdesk/communications',
+  },
+  payment: {
+    GUEST:       '/guest/invoices',
+    FINANCE:     '/finance/invoices',
+    MANAGER:     '/finance/invoices',
+    ADMIN:       '/finance/invoices',
+  },
+  task: {
+    SERVICE_STAFF: '/servicestaff/fulfillment',
+  },
+  housekeeping: {
+    HOUSEKEEPING: '/housekeeping/tasks',
+    MANAGER:      '/housekeeping/tasks',
+    ADMIN:        '/housekeeping/tasks',
+  },
 };
 
 function getGreeting() {
@@ -70,22 +105,9 @@ export default function Header() {
     markOneRead(n.id);
     setNotifOpen(false);
 
-    if (user) {
-      if (n.type === 'booking') {
-        if (user.role === 'GUEST') navigate('/guest/reservations');
-        else if (user.role === 'FRONT_DESK' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/frontdesk/reservations');
-      } else if (n.type === 'service') {
-        if (user.role === 'GUEST') navigate('/guest/service-requests');
-        else if (user.role === 'FRONT_DESK' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/frontdesk/communications');
-      } else if (n.type === 'payment') {
-        if (user.role === 'GUEST') navigate('/guest/invoices');
-        else if (user.role === 'FINANCE' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/finance/invoices');
-      } else if (n.type === 'task') {
-        if (user.role === 'SERVICE_STAFF') navigate('/servicestaff/fulfillment');
-      } else if (n.type === 'housekeeping') {
-        if (user.role === 'HOUSEKEEPING' || user.role === 'MANAGER' || user.role === 'ADMIN') navigate('/housekeeping/tasks');
-      }
-    }
+    if (!user) return;
+    const target = NOTIF_ROUTES[n.type]?.[user.role];
+    if (target) navigate(target);
   };
 
   // ── Polling ──────────────────────────────────────────

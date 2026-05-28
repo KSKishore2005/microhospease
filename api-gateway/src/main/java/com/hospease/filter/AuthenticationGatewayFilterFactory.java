@@ -32,6 +32,11 @@ public class AuthenticationGatewayFilterFactory
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
+    /** Trusted header names downstream services read instead of re-parsing the JWT. */
+    public static final String USER_HEADER = "X-Auth-User";
+    public static final String ROLE_HEADER = "X-Auth-Role";
+    public static final String USER_ID_HEADER = "X-Auth-User-Id";
+
     @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
@@ -51,6 +56,9 @@ public class AuthenticationGatewayFilterFactory
             }
             String token = authHeader.substring(7);
 
+            final String email;
+            final String role;
+            final String userId;
             try {
                 Claims claims = Jwts.parser()
                         .verifyWith(getSigningKey())
@@ -66,7 +74,12 @@ public class AuthenticationGatewayFilterFactory
                     return exchange.getResponse().setComplete();
                 }
 
-                log.debug("Gateway validated token for user '{}'", claims.getSubject());
+                email = claims.getSubject();
+                role = claims.get("role", String.class);
+                Object uid = claims.get("userId");
+                userId = uid != null ? String.valueOf(uid) : "";
+
+                log.debug("Gateway validated token for user '{}' role '{}'", email, role);
             } catch (ExpiredJwtException e) {
                 log.warn("Expired JWT at gateway: {}", e.getMessage());
                 exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
@@ -77,13 +90,26 @@ public class AuthenticationGatewayFilterFactory
                 return exchange.getResponse().setComplete();
             }
 
-            // Explicitly forward the original Authorization header to downstream services.
-            // Spring Cloud Gateway preserves headers by default but being explicit prevents
-            // surprises when filter ordering changes.
+            // Inject trusted X-Auth-* headers so downstream services don't have
+            // to re-validate the JWT. CRITICAL: strip any inbound copies of
+            // these headers FIRST so an attacker can't spoof their role by
+            // sending `X-Auth-Role: ADMINISTRATOR` alongside a valid token.
+            // Authorization is forwarded too so user-service can still echo it
+            // back on /api/auth/refresh-token and similar self-introspection.
             final String authToForward = authHeader;
             return chain.filter(
                     exchange.mutate()
-                            .request(r -> r.header(HttpHeaders.AUTHORIZATION, authToForward))
+                            .request(r -> r
+                                    // Remove any spoofed inbound copies before injecting our own.
+                                    .headers(h -> {
+                                        h.remove(USER_HEADER);
+                                        h.remove(ROLE_HEADER);
+                                        h.remove(USER_ID_HEADER);
+                                    })
+                                    .header(HttpHeaders.AUTHORIZATION, authToForward)
+                                    .header(USER_HEADER, email == null ? "" : email)
+                                    .header(ROLE_HEADER, role == null ? "" : role)
+                                    .header(USER_ID_HEADER, userId))
                             .build()
             );
         };

@@ -50,15 +50,19 @@ public class AuthService {
                     "Email is already registered: " + request.getEmail());
         }
 
-        // The public /register endpoint can only create GUEST accounts. If a request
-        // sneaks in a privileged role (ADMINISTRATOR, MANAGER, …), silently coerce
-        // it down to GUEST rather than handing out admin to anyone who asks.
+        // The public /register endpoint can only create GUEST accounts. Reject
+        // privileged-role attempts with a 400 so the attempt is visible to
+        // monitoring instead of being silently downgraded (S-M4).
         String requested = request.getRole() != null ? request.getRole().toUpperCase() : "";
-        String role = SELF_REGISTERABLE_ROLES.contains(requested) ? requested : "GUEST";
-        if (!requested.isBlank() && !role.equals(requested)) {
-            log.warn("Rejected self-register role '{}' for email {}, defaulting to GUEST",
+        if (!requested.isBlank() && !SELF_REGISTERABLE_ROLES.contains(requested)) {
+            log.warn("Rejected self-register attempt with privileged role '{}' for email {}",
                     requested, request.getEmail());
+            throw new IllegalArgumentException(
+                    "Role '" + requested + "' cannot be self-assigned via /register. "
+                            + "Only GUEST accounts may be created here; an administrator "
+                            + "must promote the user via /api/users/{id}/assign-role.");
         }
+        String role = requested.isBlank() ? "GUEST" : requested;
 
         User user = new User();
         user.setName(request.getName());

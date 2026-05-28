@@ -29,7 +29,12 @@ public class AuditLogController {
     private final AuditLogService auditLogService;
 
     @PostMapping
-    @PreAuthorize("permitAll()") // allow other services
+    // Restricted to administrators (and audit-write callers via internal Feign,
+    // which forward the original X-Auth-Role). The previous permitAll() let any
+    // authenticated user — including a guest — forge entries into the audit
+    // trail. AuthService writes audit logs in-process (not via REST), so this
+    // endpoint is intended for explicit admin tooling, not for any service.
+    @PreAuthorize("hasAuthority('ADMINISTRATOR')")
     public ResponseEntity<AuditLogResponseDTO> createAuditLog(
             @RequestBody AuditLogRequestDTO dto) {
 

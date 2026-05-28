@@ -65,7 +65,17 @@ export const useAuthStore = create<AuthState>()(
       login: async (email, password) => {
         try {
           const data = await authApi.login(email, password);
-          const frontendRole = ROLE_MAP[data.role] ?? 'GUEST';
+
+          // Reject unknown backend roles loudly instead of silently coercing
+          // to GUEST (S-M1/S-M5). Otherwise a typo or misconfigured user role
+          // lands the operator in the guest portal with no explanation.
+          if (!ROLE_MAP[data.role]) {
+            return {
+              success: false,
+              error: `Server returned an unknown role '${data.role}'. Ask an administrator to fix this account's role.`,
+            };
+          }
+          const frontendRole = ROLE_MAP[data.role];
 
           const resolvedId = resolveUserId(data);
           if (!resolvedId) {

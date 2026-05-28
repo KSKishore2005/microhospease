@@ -2,6 +2,9 @@ import apiClient from './client';
 import type { UserRole } from '../types';
 
 // Backend role → frontend UserRole
+// STAFF maps to SERVICE_STAFF as the closest match — the backend's UserRole
+// has a legacy STAFF value that shouldn't exist in new accounts but does in
+// older DB rows. Treat them as service staff in the UI.
 export const ROLE_MAP: Record<string, UserRole> = {
   ADMINISTRATOR: 'ADMIN',
   MANAGER: 'MANAGER',
@@ -11,6 +14,7 @@ export const ROLE_MAP: Record<string, UserRole> = {
   FINANCE_OFFICER: 'FINANCE',
   AUDITOR: 'REPORTING',
   GUEST: 'GUEST',
+  STAFF: 'SERVICE_STAFF',
 };
 
 // Frontend UserRole → backend role string (for registration)

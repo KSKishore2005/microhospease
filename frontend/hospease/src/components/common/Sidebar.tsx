@@ -69,7 +69,7 @@ const navConfig: Record<UserRole, NavItem[]> = {
 const roleLabels: Record<UserRole, string> = {
   GUEST: 'Guest Portal', FRONT_DESK: 'Front Desk', HOUSEKEEPING: 'Housekeeping',
   SERVICE_STAFF: 'Service Staff', FINANCE: 'Finance', MANAGER: 'Manager Panel',
-  ADMIN: 'Admin Panel', REPORTING: 'Analytics',
+  ADMIN: 'Admin Panel', REPORTING: 'Reporting',
 };
 
 const roleColors: Record<UserRole, string> = {

@@ -390,6 +390,258 @@ Across all the bugs found this session — both the 16 already fixed and the 24 
 
 ---
 
+## 6.6 Security Audit — All Portals & Roles
+
+A complete RBAC + auth-flow audit performed on **2026-05-28** after the gateway-only JWT validation refactor. Each portal, role, and endpoint was inspected. **Treat all CRITICAL items as blocking — do not deploy to production until they're fixed.**
+
+### 6.6.1 Top-level findings — status after 2026-05-28 remediation pass
+
+| ID | Severity | Title | Status |
+|---|---|---|---|
+| S-C1 | CRITICAL | Gateway didn't strip inbound X-Auth-* headers | ✅ Fixed (strip-before-inject in `AuthenticationGatewayFilterFactory`) |
+| S-C2 | CRITICAL | Services bound 0.0.0.0; trusted headers unconditionally | ✅ Fixed (`server.address=127.0.0.1` + Eureka `ip-address`) |
+| S-C3 | CRITICAL | AuditLog GETs effectively unprotected (`hasAuthority` mismatch) | ✅ Fixed (HeaderAuthFilter no longer adds bogus `ROLE_` prefix; `@PreAuthorize` now matches) |
+| S-H1 | HIGH | `POST /api/audit-logs` was `permitAll()` | ✅ Fixed (now `@PreAuthorize("hasAuthority('ADMINISTRATOR')")`) |
+| S-H2 | HIGH | JWT secret hardcoded in 7 configs | ✅ Fixed (env-var with dev default; deleted from 5 downstream services) |
+| S-M1 | MEDIUM | Unknown backend roles silently coerced to GUEST | ✅ Fixed (login returns clear error) |
+| S-M2 | MEDIUM | `STAFF` backend role had no `ROLE_MAP` entry | ✅ Fixed (mapped to `SERVICE_STAFF`) |
+| S-M3 | MEDIUM | JWT in localStorage (XSS risk) | ⏸ Deferred (requires HttpOnly cookie migration — multi-day refactor) |
+| S-M4 | MEDIUM | Self-register silently coerced privileged-role attempts to GUEST | ✅ Fixed (now throws BadRequest) |
+| S-M5 | MEDIUM | Post-login redirect defaulted to `/guest` for unknown roles | ✅ Fixed via S-M1 (login fails before redirect runs) |
+| S-L1 | LOW | CORS origins hardcoded for dev only | ✅ Fixed (`cors.allowed-origins` env-var with dev default) |
+| S-L2 | LOW | Header.tsx had inline role→route chain | ✅ Fixed (centralised `NOTIF_ROUTES` map) |
+| S-L3 | LOW | "Auditor" vs "Analytics" label mismatch | ✅ Fixed (both now "Reporting") |
+
+### 6.6.2 Role × Portal access matrix (intended design)
+
+Mapping between **backend roles** (in `UserRole` enum) → **frontend roles** (via `ROLE_MAP` in `auth.ts`) → **portal access**:
+
+| Backend role | Frontend role | Default landing | Sidebar access |
+|---|---|---|---|
+| `GUEST` | `GUEST` | `/guest` | Guest portal only |
+| `FRONT_DESK_STAFF` | `FRONT_DESK` | `/frontdesk` | Front Desk portal |
+| `HOUSEKEEPING_STAFF` | `HOUSEKEEPING` | `/housekeeping` | Housekeeping portal |
+| `RESTAURANT_SERVICE_STAFF` | `SERVICE_STAFF` | `/servicestaff` | Service Staff portal |
+| `FINANCE_OFFICER` | `FINANCE` | `/finance` | Finance portal |
+| `MANAGER` | `MANAGER` | `/manager` | Manager + most operational portals |
+| `ADMINISTRATOR` | `ADMIN` | `/admin` | **All** portals |
+| `AUDITOR` | `REPORTING` | `/reporting` | Reporting + read-only access |
+| `STAFF` | `GUEST` *(fallback!)* | `/guest` | ⚠️ Bug — see issue S-M5 |
+
+### 6.6.3 Critical findings
+
+#### 🔴 S-C1 — Gateway forwards incoming `X-Auth-*` headers unchanged
+
+**File:** [`api-gateway/.../AuthenticationGatewayFilterFactory.java:99-107`](C:\MyProject\microhospease\api-gateway\src\main\java\com\hospease\filter\AuthenticationGatewayFilterFactory.java)
+
+**Symptom:** The gateway adds its own `X-Auth-User`/`X-Auth-Role` headers but **does not strip incoming versions**. An attacker who sends both `Authorization: Bearer <real-guest-token>` and `X-Auth-Role: ADMINISTRATOR` will have both headers reach the downstream service. Whether the attack succeeds depends on which header the downstream filter reads first (currently undefined behavior — depends on Servlet container's header iteration order).
+
+**Exploit:**
+```bash
+curl -H "Authorization: Bearer <my-guest-JWT>" \
+     -H "X-Auth-Role: ADMINISTRATOR" \
+     -H "X-Auth-User: pwned@hacker.com" \
+     http://localhost:8765/api/users
+```
+
+**Fix:** In the gateway filter, after JWT validation, explicitly clear inbound headers before re-adding:
+```java
+.request(r -> r
+    .headers(h -> { h.remove(USER_HEADER); h.remove(ROLE_HEADER); h.remove(USER_ID_HEADER); })
+    .header(USER_HEADER, email)
+    .header(ROLE_HEADER, role)
+    .header(USER_ID_HEADER, userId))
+```
+
+#### 🔴 S-C2 — Downstream services bind to all interfaces, trust `X-Auth-*` unconditionally
+
+**Files:** all 5 services' `application.properties`/`.yml` (e.g., `server.port=8082` with no `server.address`); [`SecurityConfig$HeaderAuthFilter`](C:\MyProject\microhospease\room-housekeeping-service\src\main\java\com\cognizant\security\SecurityConfig.java)
+
+**Symptom:** Each microservice listens on `0.0.0.0:<port>` and trusts `X-Auth-*` headers without any check that the request came through the gateway. Anyone with network access to ports 8082-8088 can bypass authentication entirely.
+
+**Exploit:**
+```bash
+# Bypass the gateway, hit room-service directly, claim to be administrator
+curl -H "X-Auth-Role: ADMINISTRATOR" -H "X-Auth-User: anyone" \
+     http://localhost:8082/api/staff
+# → returns full staff list with no auth
+```
+
+**Fix (any one of):**
+1. **Bind services to localhost only:** add `server.address=127.0.0.1` to each downstream service's properties so external traffic can't reach them.
+2. **Network firewall:** in production, only the gateway's IP should be able to reach the service ports.
+3. **Shared-secret header check:** the gateway adds `X-Gateway-Secret: <random>` and each service rejects requests without it. Defense in depth.
+4. **mTLS between gateway and services** — most rigorous, hardest to set up.
+
+#### 🔴 S-C3 — `AuditLogController` GET endpoints have NO `@RoleRequired`
+
+**File:** [`user-service/.../controller/AuditLogController.java:43-80`](C:\MyProject\microhospease\user-service\src\main\java\com\cognizant\user_service\controller\AuditLogController.java)
+
+**Symptom:** Four endpoints leak the entire audit trail to any authenticated user (any role, including GUEST):
+
+| Method | Path | Currently |
+|---|---|---|
+| `GET` | `/api/audit-logs` | No role check → any logged-in user |
+| `GET` | `/api/audit-logs/{id}` | No role check |
+| `GET` | `/api/audit-logs/user/{userId}` | No role check — guest can enumerate other users' actions |
+| `GET` | `/api/audit-logs/resource/{type}/{id}` | No role check |
+
+**Exploit:** Any logged-in guest can call `/api/audit-logs/user/1` and read what admin user 1 did, when, with what IP.
+
+**Fix:** Add `@RoleRequired({"ADMINISTRATOR", "AUDITOR"})` to all GET methods in `AuditLogController`. The POST endpoint should be restricted to internal service-to-service calls (or guarded with `@RoleRequired({"ADMINISTRATOR"})` plus rate-limited).
+
+### 6.6.4 High findings
+
+#### 🟠 S-H1 — `POST /api/audit-logs` has `permitAll()`
+
+**File:** [`AuditLogController.java:32`](C:\MyProject\microhospease\user-service\src\main\java\com\cognizant\user_service\controller\AuditLogController.java)
+
+**Symptom:** Any client can POST forged audit log entries, polluting the audit trail and potentially obscuring real security events.
+
+**Fix:** Restrict to `@RoleRequired({"ADMINISTRATOR"})` for direct calls, OR (better) gate via the gateway routes so only internal services can reach it. Audit logs should be **append-only from trusted callers**.
+
+#### 🟠 S-H2 — JWT secret hardcoded in every service's config
+
+**File:** [`api-gateway/.../application.yml:64`](C:\MyProject\microhospease\api-gateway\src\main\resources\application.yml), [`user-service/.../application.properties:33`](C:\MyProject\microhospease\user-service\src\main\resources\application.properties), and 5 others
+
+**Symptom:** The secret `3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007` is committed in plaintext in 7 files. If the repo is pushed to a public location, every JWT is forgeable.
+
+**Fix:** Move to an environment variable: `app.jwt.secret=${JWT_SECRET}`. Document in a `.env.example` and add `.env` to `.gitignore`. The downstream services (5 of them) don't read the secret anymore — drop the config line from them entirely.
+
+### 6.6.5 Medium findings
+
+#### 🟡 S-M1 — Unknown backend roles silently coerce to `GUEST`
+
+**File:** [`authStore.ts:44`](C:\MyProject\microhospease\frontend\hospease\src\store\authStore.ts) — `const frontendRole = ROLE_MAP[data.role] ?? 'GUEST';`
+
+**Symptom:** If the backend returns any role not in `ROLE_MAP` (e.g., `STAFF`, or a typo in the DB), the user is silently logged in as `GUEST`. They lose access to whatever portal they were meant to use, with no error explaining why.
+
+**Fix:** Reject the login with a clear error message:
+```ts
+if (!ROLE_MAP[data.role]) {
+  return { success: false, error: `Unknown server role '${data.role}'. Contact admin.` };
+}
+```
+
+#### 🟡 S-M2 — `STAFF` backend role has no `ROLE_MAP` entry
+
+Same root cause as S-M1. The `UserRole.STAFF` enum value exists but isn't mapped, so any user assigned `STAFF` becomes a `GUEST` in the UI. Either delete `STAFF` from the enum or add `STAFF: 'STAFF'` to ROLE_MAP with its own default route. (Also listed as Known Issue #5 in §6.)
+
+#### 🟡 S-M3 — Frontend JWT stored in `localStorage`
+
+**File:** [`authStore.ts`](C:\MyProject\microhospease\frontend\hospease\src\store\authStore.ts), [`client.ts:6`](C:\MyProject\microhospease\frontend\hospease\src\api\client.ts)
+
+**Symptom:** XSS in any dependency steals the token. Common SPA tradeoff — but should be flagged.
+
+**Fix (defense-in-depth):** Migrate to HttpOnly secure cookies set by the backend; or at minimum, add a Content-Security-Policy header and a Subresource Integrity check on third-party scripts.
+
+#### 🟡 S-M4 — Self-registration coerces privileged roles to `GUEST` silently
+
+**File:** [`AuthService.java:34, 56-57`](C:\MyProject\microhospease\user-service\src\main\java\com\cognizant\user_service\service\AuthService.java)
+
+**Symptom:** If someone POSTs `{"role": "ADMINISTRATOR"}` to `/api/auth/register`, the backend silently downgrades to GUEST and logs a WARN. The behavior is correct (prevents privilege escalation) but the silent coercion masks the attempted exploit. Should return 400 to make the attempt visible.
+
+#### 🟡 S-M5 — Post-login redirect defaults to `/guest` for unknown roles
+
+**File:** `LoginPage.tsx:55` — `navigate(roleRedirects[u?.role ?? ''] ?? '/guest')`
+
+**Symptom:** Same pattern as S-M1 — silent fallback hides bugs. Should redirect to `/unauthorized` with an explanation instead.
+
+### 6.6.6 Low findings
+
+#### 🟢 S-L1 — CORS allows credentials on all dev origins
+
+**File:** [`api-gateway/.../SecurityConfig.java:35-44`](C:\MyProject\microhospease\api-gateway\src\main\java\com\hospease\config\SecurityConfig.java)
+
+Configured for localhost:3000/5173 with `allowCredentials=true`. Fine for dev. **Must change** for prod — the prod origin list should be explicit and credentials should be reviewed.
+
+#### 🟢 S-L2 — Header.tsx notification handler does role comparisons inline
+
+**File:** `components/common/Header.tsx:74-87`
+
+Hardcoded `if (user.role === 'FRONT_DESK' || ...)` chain — works today but drifts easily. Recommend centralising the role→default-route mapping.
+
+#### 🟢 S-L3 — Demo account label mismatch
+
+LoginPage labels an account "Auditor" but the Sidebar shows "Analytics" for the same role. Cosmetic confusion.
+
+### 6.6.7 RBAC coverage map (key endpoints)
+
+Concise audit of who can call what across the system. Asterisks mark endpoints where the role list looks too broad for the operation's sensitivity.
+
+| Endpoint | Roles allowed | Notes |
+|---|---|---|
+| `POST /api/users` | ADMIN | ✅ |
+| `DELETE /api/users/{id}` | ADMIN | ✅ |
+| `GET /api/audit-logs` | (none) | 🔴 **S-C3 — no role check** |
+| `POST /api/v1/reservations` | GUEST, FRONT_DESK, MANAGER, ADMIN | ✅ |
+| `DELETE /api/v1/reservations/{id}` | ADMIN | ✅ |
+| `POST /api/staff` | ADMIN, MANAGER | ✅ |
+| `POST /api/shifts` | MANAGER, ADMIN | ✅ |
+| `POST /api/rooms` | ADMIN, MANAGER | ✅ |
+| `PATCH /api/service-orders/{id}/assign` | SERVICE, HOUSEKEEPING, FRONT_DESK, MANAGER, ADMIN | ✅ — any operational staff can re-assign |
+| `POST /api/invoices/generate/{reservationId}` | FRONT_DESK, FINANCE, MANAGER, ADMIN | ✅ |
+| `DELETE /api/invoices/{id}` | ADMIN | ✅ |
+| `POST /api/payments` | GUEST, FRONT_DESK, FINANCE, MANAGER, ADMIN | ✅ — guest can pay own invoice |
+| `PATCH /api/payments/{id}/refund` | FINANCE, MANAGER, ADMIN | ✅ |
+| `POST /api/audit-packages` | ADMIN, AUDITOR | ✅ |
+| `POST /api/reports` | MANAGER, ADMIN, AUDITOR | ✅ |
+
+### 6.6.8 Auth-flow architecture (current state)
+
+```
+                       ┌──────────────────────┐
+                       │   user-service       │
+                       │   ISSUES JWT (sign)  │ ← only at login/register/refresh
+                       └──────────────────────┘
+                                  ▲
+                                  │
+   ┌──────┐    /api/auth/login    │
+   │Client│ ───────────────────────┘
+   └──────┘   gets JWT, stores in localStorage
+       │
+       │ Authorization: Bearer <JWT>
+       ▼
+   ┌─────────────────────┐
+   │   API GATEWAY       │
+   │                     │
+   │  ✅ validates JWT    │   ← single validator
+   │  🔴 does NOT strip   │   ← S-C1
+   │     incoming        │
+   │     X-Auth-* hdrs   │
+   │  ✅ injects new      │
+   │     X-Auth-* hdrs   │
+   └─────────┬───────────┘
+             │
+             │   X-Auth-User: jane@x.com
+             │   X-Auth-Role: MANAGER
+             │   X-Auth-User-Id: 23
+             │
+             ▼
+   ┌─────────────────────┐
+   │  Microservice       │
+   │  HeaderAuthFilter   │   ← trusts headers
+   │  RoleInterceptor    │   ← checks @RoleRequired
+   │  Controller         │
+   └─────────────────────┘
+             ▲
+             │ 🔴 S-C2 — accessible directly on port 8082-8088
+             │           without going through gateway
+   ┌──────────┐
+   │ Attacker │ ── X-Auth-Role: ADMINISTRATOR ──►
+   │ on LAN   │
+   └──────────┘
+```
+
+### 6.6.9 Recommended remediation order
+
+1. **Now (CRITICAL):** Patch S-C1 (gateway header strip — 5 lines), S-C2 (`server.address=127.0.0.1` in each service's properties — 5 one-line changes), S-C3 (add `@RoleRequired` to 4 audit-log GETs).
+2. **This sprint (HIGH):** S-H1 (audit-log POST restriction), S-H2 (move JWT secret to env var, delete from 5 services).
+3. **Before prod (MEDIUM):** S-M1-S-M5 (better fallback errors, HttpOnly cookies, etc.).
+4. **Cleanup (LOW):** S-L1-S-L3 (CORS prod config, navigation centralisation, label fixes).
+
+---
+
 ## 7. 10-Minute Smoke Test
 
 After any code change, run this rapid sanity-check before doing a full E2E:

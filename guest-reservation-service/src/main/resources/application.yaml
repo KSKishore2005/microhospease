@@ -1,9 +1,10 @@
 server:
   port: 8083
+  # Bind to loopback so external callers can't bypass the gateway (S-C2).
+  # Override with SERVICE_BIND_ADDR=0.0.0.0 for prod with firewalled networks.
+  address: ${SERVICE_BIND_ADDR:127.0.0.1}
 
-app:
-  jwt:
-    secret: 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007
+# JWT secret no longer needed — gateway is the only validator. Removed (S-H2).
 
 spring:
   application:
@@ -61,6 +62,8 @@ eureka:
     fetch-registry: true
   instance:
     prefer-ip-address: true
+    # Match server.address so gateway → service discovery resolves to a reachable host.
+    ip-address: ${SERVICE_BIND_ADDR:127.0.0.1}
 
 management:
   endpoints:

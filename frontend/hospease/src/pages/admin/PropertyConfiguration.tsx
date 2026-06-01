@@ -80,9 +80,19 @@ export default function PropertyConfiguration() {
     setEditRate(room.ratePerNight);
   };
 
-  const saveEdit = (roomId: string) => {
-    updateMutation.mutate({ id: roomId, payload: { ratePerNight: editRate } });
-  };
+const saveEdit = (room: RoomResponseDto) => {
+  updateMutation.mutate({
+    id: room.roomId,
+    payload: {
+      number: room.number,
+      type: room.type,
+      capacity: room.capacity,
+      amenitiesJson: room.amenitiesJson,
+      status: room.status,
+      ratePerNight: editRate,   // only this field actually changes
+    },
+  });
+};
 
   const handleEditFacility = (facility: typeof INITIAL_FACILITIES[0]) => {
     setEditingFacility(facility);
@@ -163,7 +173,7 @@ export default function PropertyConfiguration() {
                         <>
                           <input type="number" value={editRate} onChange={(e) => setEditRate(Number(e.target.value))}
                             className="w-24 px-2 py-1 text-sm border border-navy-300 rounded-lg focus:outline-none text-right" />
-                          <Button size="sm" icon={<Save size={13} />} onClick={() => saveEdit(room.roomId)}
+                          <Button size="sm" icon={<Save size={13} />} onClick={() => saveEdit(room)}
                             disabled={updateMutation.isPending}>Save</Button>
                         </>
                       ) : (

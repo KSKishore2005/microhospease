@@ -4,7 +4,7 @@ import { guestsApi } from '../api/guests';
 
 /**
  * Resolves the current guest user's guestId, creating the profile if needed.
- *
+
  * Uses the backend's idempotent /v1/guests/upsert endpoint so a fresh login
  * (e.g. demo Guest account) is never blocked by missing profile state — one
  * call always returns a valid guestId for ACTIVE guests.

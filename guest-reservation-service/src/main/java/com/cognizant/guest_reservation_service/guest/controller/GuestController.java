@@ -12,9 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * REST controller for Guest management.
- */
 @RestController
 @RequestMapping("/api/v1/guests")
 @RequiredArgsConstructor
@@ -60,11 +57,6 @@ public class GuestController {
                 .body(guestService.createGuest(requestDto));
     }
 
-    /**
-     * Idempotent "ensure my profile exists" endpoint. Returns the existing guest
-     * by email (case-insensitive) or creates a minimal one — never errors out
-     * on "already exists". Used by the frontend on first guest-area page load.
-     */
     @PostMapping("/upsert")
     @RoleRequired({"GUEST", "FRONT_DESK_STAFF", "MANAGER", "ADMINISTRATOR"})
     public ResponseEntity<GuestResponseDto> upsertGuest(

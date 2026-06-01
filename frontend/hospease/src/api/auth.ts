@@ -1,10 +1,7 @@
  import apiClient from './client';
 import type { UserRole } from '../types';
 
-// Backend role → frontend UserRole
-// STAFF maps to SERVICE_STAFF as the closest match — the backend's UserRole
-// has a legacy STAFF value that shouldn't exist in new accounts but does in
-// older DB rows. Treat them as service staff in the UI.
+
 export const ROLE_MAP: Record<string, UserRole> = {
   ADMINISTRATOR: 'ADMIN',
   MANAGER: 'MANAGER',
@@ -29,10 +26,7 @@ export const ROLE_MAP_REVERSE: Record<UserRole, string> = {
   GUEST: 'GUEST',
 };
 
-// Backend serialises with @JsonProperty("user_id") and @JsonProperty("token_type"),
-// so the actual JSON uses snake_case for those fields. Declared as optional on
-// both shapes so authStore can tolerate either casing — never trust a single
-// key. See authStore.resolveUserId() for the resolution.
+
 export interface AuthResponse {
   token: string;
   tokenType?: string;

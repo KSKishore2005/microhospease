@@ -107,7 +107,10 @@ public class ServiceOrderController {
     }
 
     @PatchMapping("/{id}/status")
-    @RoleRequired({"FRONT_DESK_STAFF", "RESTAURANT_SERVICE_STAFF", "MANAGER", "ADMINISTRATOR"})
+    // HOUSEKEEPING_STAFF added so housekeepers can advance the requests the
+    // manager assigns to them (PENDING → IN_PROGRESS → CONFIRMED → COMPLETED).
+    // Without this, the Task List "Start" and "Done" buttons silently 403'd.
+    @RoleRequired({"FRONT_DESK_STAFF", "RESTAURANT_SERVICE_STAFF", "HOUSEKEEPING_STAFF", "MANAGER", "ADMINISTRATOR"})
     public ResponseEntity<ServiceOrderResponseDto> updateOrderStatus(
             @PathVariable Long id,
             @RequestParam ServiceOrderStatus status) {

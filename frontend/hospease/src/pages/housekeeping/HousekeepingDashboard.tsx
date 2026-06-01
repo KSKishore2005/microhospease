@@ -8,6 +8,7 @@ import { statusBadge } from '../../utils/statusBadge';
 import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';
 import { usersApi } from '../../api/users';
+import { serviceOrdersApi } from '../../api/serviceOrders';
 import { useAuthStore } from '../../store/authStore';
 import { formatRelative } from '../../utils/formatters';
 import { useMemo } from 'react';
@@ -19,17 +20,62 @@ export default function HousekeepingDashboard() {
   const { data: allTasks = [], isLoading: tasksLoading } = useQuery({ queryKey: ['housekeeping'], queryFn: housekeepingApi.getAll });
   const { data: rooms = [], isLoading: roomsLoading }  = useQuery({ queryKey: ['rooms'],                     queryFn: roomsApi.getAll });
   const { data: users = [], isLoading: usersLoading }  = useQuery({ queryKey: ['users'],                     queryFn: usersApi.getAll, enabled: isManagerView });
+
+  // Also pull service orders assigned to this user — manager-dispatched
+  // requests live in service_orders, NOT housekeeping_tasks, so without this
+  // the dashboard would always show 0 even when work is queued (same root
+  // cause as the Task List bug).
+  const { data: assignedOrders = [] } = useQuery({
+    queryKey: ['service-orders', 'assignee', user?.id],
+    queryFn: () => serviceOrdersApi.getByAssignee(user!.id),
+    enabled: !!user?.id,
+  });
+
   const { roomFlags } = useRoomStatusStore();
 
   const userMap = useMemo(() => new Map(users.map((u) => [String(u.userId), u.name])), [users]);
 
-  // Strict role-based filtering
-  const tasks = useMemo(() => {
+  /** A normalised view of both housekeeping_tasks and service_orders so the
+   * counters and "Today's Tasks" list work the same way for either source.
+   * CONFIRMED ("Ready") from the service-order kanban is treated as
+   * IN_PROGRESS here because the housekeeper isn't done until the order hits
+   * COMPLETED. */
+  type Row = {
+    taskId: string;                       // unique key (with source prefix to avoid collisions)
+    status: string;
+    assignedToUserId?: string;
+    roomId?: string | number;
+    scheduledAt?: string;
+    source: 'HK' | 'SO';
+    taskType?: string;                    // 'Room Cleaning' or service-order type
+  };
+
+  const tasks = useMemo<Row[]>(() => {
+    const hk: Row[] = allTasks.map((t) => ({
+      taskId: `hk-${t.taskId}`,
+      status: t.status,
+      assignedToUserId: t.assignedToUserId ? String(t.assignedToUserId) : undefined,
+      roomId: t.roomId,
+      scheduledAt: t.scheduledAt,
+      source: 'HK',
+      taskType: 'Room Cleaning',
+    }));
+    const so: Row[] = assignedOrders.map((o) => ({
+      taskId: `so-${o.orderId}`,
+      status: o.status === 'CONFIRMED' ? 'IN_PROGRESS' : o.status,
+      assignedToUserId: o.assignedToUserId ? String(o.assignedToUserId) : undefined,
+      roomId: o.roomId,
+      scheduledAt: o.createdAt,
+      source: 'SO',
+      taskType: o.serviceType?.replace(/_/g, ' '),
+    }));
+    const merged = [...hk, ...so];
+
     if (user?.role === 'HOUSEKEEPING') {
-      return allTasks.filter((t) => String(t.assignedToUserId) === String(user.id));
+      return merged.filter((t) => String(t.assignedToUserId) === String(user.id));
     }
-    return allTasks;
-  }, [allTasks, user]);
+    return merged;
+  }, [allTasks, assignedOrders, user]);
 
   const roomMap = useMemo(
     () => Object.fromEntries(rooms.map((r) => [r.roomId, r.number])),
@@ -189,7 +235,7 @@ export default function HousekeepingDashboard() {
                     </div>
                     <div>
                       <span className="font-medium text-gray-400">Task Type: </span>
-                      <span className="text-navy-900 font-medium">Room Cleaning</span>
+                      <span className="text-navy-900 font-medium">{t.taskType ?? 'Room Cleaning'}</span>
                     </div>
                     <div>
                       <span className="font-medium text-gray-400">Assigned Staff: </span>

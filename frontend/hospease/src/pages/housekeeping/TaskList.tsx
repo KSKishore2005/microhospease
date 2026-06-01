@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { CheckCircle, Play, SkipForward, ClipboardList, Loader2, Clock, Users } from 'lucide-react';
+import { CheckCircle, Play, SkipForward, ClipboardList, Loader2, Clock, Users, Sparkles } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Badge from '../../components/common/Badge';
 import { statusBadge } from '../../utils/statusBadge';
@@ -7,9 +7,24 @@ import Button from '../../components/common/Button';
 import { housekeepingApi } from '../../api/housekeeping';
 import { roomsApi } from '../../api/rooms';
 import { usersApi } from '../../api/users';
+import { serviceOrdersApi, type ServiceOrderResponseDto } from '../../api/serviceOrders';
 import { useAuthStore } from '../../store/authStore';
 import { useRoomStatusStore } from '../../store/roomStatusStore';
+import { useToastStore } from '../../store/toastStore';
 import { formatRelative } from '../../utils/formatters';
+
+/** Pull a useful error message off an Axios error so failures surface in a
+ *  toast instead of being swallowed. */
+function errMessage(e: unknown, fallback: string): string {
+  const ax = e as { response?: { status?: number; data?: { message?: string } }; message?: string };
+  const status = ax?.response?.status;
+  const msg = ax?.response?.data?.message;
+  if (status === 403) return `Forbidden: your role can't perform this action. (${msg ?? 'no detail'})`;
+  if (status === 400) return msg ?? 'Bad request.';
+  if (status === 404) return 'Not found — the task may have been removed.';
+  if (status === 401) return 'Your session expired. Sign in again.';
+  return msg ?? ax?.message ?? fallback;
+}
 
 type StatusFilter = 'ALL' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 type ScopeFilter  = 'MINE' | 'ALL';
@@ -19,6 +34,37 @@ const statusConfig = {
   IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-50 border-blue-200 text-blue-700',       icon: <Loader2 size={14} className="text-blue-500" /> },
   COMPLETED:   { label: 'Completed',   color: 'bg-emerald-50 border-emerald-200 text-emerald-700', icon: <CheckCircle size={14} className="text-emerald-500" /> },
 } as const;
+
+/**
+ * A unified view-model so we can render both raw HousekeepingTask records and
+ * ServiceOrder records assigned to a housekeeper in one list. Without this,
+ * service-orders the Manager dispatches via the assign-staff dropdown
+ * (which writes service_orders.assigned_to_user_id, NOT a row in
+ * housekeeping_tasks) would never appear in the housekeeper's Task List.
+ */
+type DisplayTask = {
+  source: 'HK' | 'SO';
+  id: string;
+  roomId: string | number | undefined;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | string;
+  rawStatus: string;        // for service orders this can be CONFIRMED
+  assignedToUserId?: string;
+  scheduledAt?: string;
+  completedAt?: string;
+  // service-order extras
+  description?: string;
+  serviceType?: string;
+};
+
+/** Status mapping for service orders: CONFIRMED ("Ready") is treated like
+ * IN_PROGRESS in the housekeeping list so the housekeeper sees a 3-step
+ * lifecycle: Pending → In Progress → Completed. The Complete button chains
+ * the necessary state-machine transitions internally (IN_PROGRESS → CONFIRMED
+ * → COMPLETED) to satisfy the backend state machine. */
+function soDisplayStatus(s: string): string {
+  if (s === 'CONFIRMED') return 'IN_PROGRESS';
+  return s;
+}
 
 export default function TaskList() {
   const { user } = useAuthStore();
@@ -31,10 +77,20 @@ export default function TaskList() {
 
   const queryClient = useQueryClient();
   const { setFlag } = useRoomStatusStore();
+  const addToast = useToastStore((s) => s.addToast);
 
   const { data: allTasks = [], isLoading } = useQuery({
     queryKey: ['housekeeping'],
     queryFn: housekeepingApi.getAll,
+  });
+
+  // Service orders assigned to this user (the second source the original page
+  // missed). For housekeeping role we always query; for manager view we query
+  // when needed for the team view as well.
+  const { data: assignedOrders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['service-orders', 'assignee', userId],
+    queryFn: () => serviceOrdersApi.getByAssignee(userId!),
+    enabled: !!userId,
   });
 
   const { data: users = [] } = useQuery({
@@ -62,13 +118,80 @@ export default function TaskList() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['housekeeping'] }),
   });
 
+  /** Service-order mutation. Used for advancing through the kanban states.
+   * The backend state machine enforces PENDING → IN_PROGRESS → CONFIRMED →
+   * COMPLETED, so completing from IN_PROGRESS requires two API calls in
+   * sequence — chained inside completeServiceOrder() below. Errors surface
+   * in a toast so the button never feels like a no-op. */
+  const completeServiceOrder = async (id: string, currentStatus: string) => {
+    try {
+      if (currentStatus === 'IN_PROGRESS') {
+        await serviceOrdersApi.updateStatus(id, 'CONFIRMED');
+        await serviceOrdersApi.updateStatus(id, 'COMPLETED');
+      } else if (currentStatus === 'CONFIRMED') {
+        await serviceOrdersApi.updateStatus(id, 'COMPLETED');
+      } else if (currentStatus === 'PENDING') {
+        // Defensive: if user clicks Complete on a PENDING task, walk through
+        // all 3 transitions. Backend rejects any illegal step with 400, which
+        // surfaces in the toast.
+        await serviceOrdersApi.updateStatus(id, 'IN_PROGRESS');
+        await serviceOrdersApi.updateStatus(id, 'CONFIRMED');
+        await serviceOrdersApi.updateStatus(id, 'COMPLETED');
+      }
+      queryClient.invalidateQueries({ queryKey: ['service-orders', 'assignee', userId] });
+      addToast('Task marked complete', 'success');
+    } catch (e) {
+      console.error('Failed to complete service order', id, e);
+      addToast(errMessage(e, 'Failed to complete task. Please try again.'), 'error');
+    }
+  };
+
+  const startServiceOrder = async (id: string) => {
+    try {
+      await serviceOrdersApi.updateStatus(id, 'IN_PROGRESS');
+      queryClient.invalidateQueries({ queryKey: ['service-orders', 'assignee', userId] });
+      addToast('Task started', 'success');
+    } catch (e) {
+      console.error('Failed to start service order', id, e);
+      addToast(errMessage(e, 'Failed to start task. Please try again.'), 'error');
+    }
+  };
+
+  // Merge housekeeping_tasks + service_orders into a single unified list. This
+  // is the entire fix: the original page only saw HK tasks, so anything the
+  // Manager assigned through the service-orders flow was invisible here.
+  const unifiedTasks: DisplayTask[] = useMemo(() => {
+    const hk: DisplayTask[] = allTasks.map((t) => ({
+      source: 'HK',
+      id: t.taskId,
+      roomId: t.roomId,
+      status: t.status,
+      rawStatus: t.status,
+      assignedToUserId: t.assignedToUserId ? String(t.assignedToUserId) : undefined,
+      scheduledAt: t.scheduledAt,
+      completedAt: t.completedAt,
+    }));
+    const so: DisplayTask[] = (assignedOrders as ServiceOrderResponseDto[]).map((o) => ({
+      source: 'SO',
+      id: String(o.orderId),
+      roomId: o.roomId,
+      status: soDisplayStatus(o.status),
+      rawStatus: o.status,
+      assignedToUserId: o.assignedToUserId ? String(o.assignedToUserId) : undefined,
+      scheduledAt: o.createdAt,
+      description: o.description,
+      serviceType: o.serviceType,
+    }));
+    return [...hk, ...so];
+  }, [allTasks, assignedOrders]);
+
   // First filter by scope (mine vs all), then by status.
   // STRICT FILTERING: Housekeeping role can ONLY see their assigned tasks.
   const scoped = user?.role === 'HOUSEKEEPING'
-    ? allTasks.filter((t) => String(t.assignedToUserId) === String(userId))
+    ? unifiedTasks.filter((t) => String(t.assignedToUserId) === String(userId))
     : (scope === 'MINE' && userId
-        ? allTasks.filter((t) => String(t.assignedToUserId) === String(userId))
-        : allTasks);
+        ? unifiedTasks.filter((t) => String(t.assignedToUserId) === String(userId))
+        : unifiedTasks);
 
   const filtered = scoped.filter((t) => filter === 'ALL' || t.status === filter);
 
@@ -156,7 +279,7 @@ export default function TaskList() {
 
       {/* Task cards */}
       <div className="space-y-3">
-        {isLoading ? (
+        {(isLoading || ordersLoading) ? (
           <p className="text-center text-sm text-gray-400 py-10">Loading tasks…</p>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
@@ -174,22 +297,36 @@ export default function TaskList() {
           filtered.map((task) => {
             const cfg = statusConfig[task.status as keyof typeof statusConfig];
             const isCompleted = task.status === 'COMPLETED';
+            const isServiceOrder = task.source === 'SO';
+            const roomLabel = task.roomId !== undefined
+              ? (roomNumberMap[task.roomId as string] ?? String(task.roomId).slice(-3))
+              : '—';
+
             return (
               <div
-                key={task.taskId}
+                key={`${task.source}-${task.id}`}
                 className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-wrap items-center justify-between gap-4 transition-all ${
                   isCompleted ? 'opacity-60 border-gray-100' : 'border-gray-100 hover:border-gray-200 hover:shadow-md'
                 }`}>
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold border-2 ${cfg?.color ?? 'bg-gray-50 border-gray-200 text-gray-600'}`}>
-                    {roomNumberMap[task.roomId] ?? String(task.roomId).slice(-3)}
+                    {roomLabel}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-gray-900">Room {roomNumberMap[task.roomId] ?? task.roomId}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-gray-900">Room {roomLabel}</p>
                       <Badge variant={statusBadge(task.status)} dot>{task.status.replace('_', ' ')}</Badge>
+                      {isServiceOrder && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                          <Sparkles size={10} /> {task.serviceType?.replace(/_/g, ' ') ?? 'Service Request'}
+                        </span>
+                      )}
                     </div>
-                    {isManagerView ? (
+                    {/* Service-order description (guest request text), shown only for SO rows */}
+                    {isServiceOrder && task.description && (
+                      <p className="text-xs text-gray-500 mt-1 italic">"{task.description}"</p>
+                    )}
+                    {isManagerView && task.source === 'HK' ? (
                       <div className="flex items-center gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs text-gray-400">Assigned to:</span>
                         <select
@@ -197,7 +334,7 @@ export default function TaskList() {
                           className="select py-0.5 px-1.5 text-xs bg-white border-gray-200"
                           onChange={async (e) => {
                             const newStaffId = e.target.value;
-                            await housekeepingApi.update(task.taskId, { assignedToUserId: newStaffId || undefined });
+                            await housekeepingApi.update(task.id, { assignedToUserId: newStaffId || undefined });
                             queryClient.invalidateQueries({ queryKey: ['housekeeping'] });
                           }}
                         >
@@ -217,7 +354,7 @@ export default function TaskList() {
                               ? `Assigned to you`
                               : `Assigned to ${userMap.get(String(task.assignedToUserId)) || `User #${task.assignedToUserId}`}`)
                           : 'Unassigned'}
-                        {task.scheduledAt && ` · Scheduled: ${formatRelative(task.scheduledAt)}`}
+                        {task.scheduledAt && ` · Submitted ${formatRelative(task.scheduledAt)}`}
                       </p>
                     )}
                     {task.completedAt && (
@@ -229,7 +366,9 @@ export default function TaskList() {
                 <div className="flex items-center gap-2">
                   {task.status === 'PENDING' && (
                     <Button size="sm" variant="secondary" icon={<Play size={13} />}
-                      onClick={() => updateStatusMutation.mutate({ id: task.taskId, status: 'IN_PROGRESS' })}>
+                      onClick={() => isServiceOrder
+                        ? startServiceOrder(task.id)
+                        : updateStatusMutation.mutate({ id: task.id, status: 'IN_PROGRESS' })}>
                       Start
                     </Button>
                   )}
@@ -237,15 +376,22 @@ export default function TaskList() {
                     <>
                       <Button size="sm" variant="primary" icon={<CheckCircle size={13} />}
                         onClick={() => {
-                          updateStatusMutation.mutate({ id: task.taskId, status: 'COMPLETED' });
-                          setFlag(String(task.roomId), 'CLEAN');
+                          if (isServiceOrder) {
+                            completeServiceOrder(task.id, task.rawStatus);
+                          } else {
+                            updateStatusMutation.mutate({ id: task.id, status: 'COMPLETED' });
+                            if (task.roomId !== undefined) setFlag(String(task.roomId), 'CLEAN');
+                          }
                         }}>
                         Done
                       </Button>
-                      <Button size="sm" variant="ghost" icon={<SkipForward size={13} />}
-                        onClick={() => updateStatusMutation.mutate({ id: task.taskId, status: 'CANCELLED' })}>
-                        Skip
-                      </Button>
+                      {/* Skip only valid for housekeeping_tasks; service orders use Cancel via service-order flow */}
+                      {!isServiceOrder && (
+                        <Button size="sm" variant="ghost" icon={<SkipForward size={13} />}
+                          onClick={() => updateStatusMutation.mutate({ id: task.id, status: 'CANCELLED' })}>
+                          Skip
+                        </Button>
+                      )}
                     </>
                   )}
                   {isCompleted && (

@@ -15,6 +15,7 @@ import { useWorkflowStore } from '../../store/workflowStore';
 const SERVICE_TYPES: { type: ServiceType; label: string; icon: string }[] = [
   { type: 'ROOM_SERVICE',        label: 'Room Service',     icon: '🍽️' },
   { type: 'FOOD_AND_BEVERAGES',  label: 'Food & Beverage',  icon: '🍴' },
+  { type: 'HOUSEKEEPING',        label: 'Housekeeping',     icon: '🧹' },
   { type: 'LAUNDRY',             label: 'Laundry',          icon: '👕' },
   { type: 'SPA',                 label: 'Spa',              icon: '💆' },
   { type: 'GYM',                 label: 'Gym',              icon: '🏋️' },

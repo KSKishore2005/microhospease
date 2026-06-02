@@ -1,4 +1,4 @@
-import { Bell, Search, X } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useNotificationStore, type AppNotification } from '../../store/notificationStore';
 import { useState, useEffect, useRef } from 'react';
@@ -186,13 +186,9 @@ export default function Header() {
         </h2>
       </div>
 
-      {/* Centre — search */}
-      <div className="flex-1 max-w-xs hidden md:block">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          <input placeholder="Search anything..." className="w-full pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-navy-500/20 focus:border-navy-400 transition-all" />
-        </div>
-      </div>
+      {/* Centre — search bar removed per UX request. Spacer keeps the
+          layout's space-between rhythm so date stays left, bell/user stay right. */}
+      <div className="flex-1" />
 
       {/* Right — actions */}
       <div className="flex items-center gap-2 flex-shrink-0">

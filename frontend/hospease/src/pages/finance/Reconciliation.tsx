@@ -1,7 +1,6 @@
-import { CheckCircle, AlertCircle, Download } from 'lucide-react';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Card from '../../components/common/Card';
-import Button from '../../components/common/Button';
 import { invoicesApi } from '../../api/invoices';
 import { paymentsApi } from '../../api/payments';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -36,7 +35,6 @@ export default function Reconciliation() {
           <h1 className="text-2xl font-bold text-gray-900">Daily Reconciliation</h1>
           <p className="text-sm text-gray-400 mt-0.5">Financial close summary for {formatDate(today)}</p>
         </div>
-        <Button variant="secondary" icon={<Download size={16} />}>Export Report</Button>
       </div>
 
       {/* Status banner */}

@@ -62,7 +62,10 @@ export default function InvoicesPayments() {
     )},
     { key: 'status', label: 'Status', render: (v: unknown) => <Badge variant={statusBadge(String(v))} dot>{String(v)}</Badge> },
     {
-      key: 'invoiceId', label: 'Action',
+      // Unique key — was duplicating `invoiceId` (the column on row 52),
+      // which made React warn about duplicate children and could collapse
+      // either column under the same identity. Use a synthetic name instead.
+      key: '__actions', label: 'Action',
       render: (_v: unknown, row: Record<string, unknown>) => (
         <div className="flex gap-1.5">
           {row['status'] !== 'PAID' && (
@@ -191,7 +194,6 @@ Total Amount:    $${totalAmount.toFixed(2)}
           <h1 className="text-2xl font-bold text-gray-900">Invoices & Payments</h1>
           <p className="text-sm text-gray-400 mt-0.5">Comprehensive ledger and invoice management</p>
         </div>
-        <Button variant="secondary" icon={<Download size={16} />}>Export</Button>
       </div>
 
       {/* Stats */}

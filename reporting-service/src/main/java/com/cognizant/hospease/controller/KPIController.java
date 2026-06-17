@@ -69,7 +69,12 @@ public class KPIController {
     }
 
     @DeleteMapping("/{id}")
-    @RoleRequired({"ADMINISTRATOR"})
+    // Aligned with the other endpoints on this controller — MANAGER and
+    // AUDITOR can already create/update/calculate KPIs, so they should also
+    // be able to remove obsolete ones. Previously this endpoint required
+    // ADMINISTRATOR exclusively, which surfaced as a silent 403 in the UI
+    // ("Failed to delete KPI.") when a Manager or Auditor tried to delete.
+    @RoleRequired({"MANAGER", "ADMINISTRATOR", "AUDITOR"})
     public ResponseEntity<Void> deleteKPI(@PathVariable Long id) {
         kpiService.deleteKPI(id);
         return ResponseEntity.noContent().build();

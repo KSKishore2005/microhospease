@@ -11,6 +11,7 @@ import { formatDate } from '../../utils/formatters';
 
 /** Opens a new browser window with a clean print layout and triggers the
  *  system Print → Save as PDF dialog. Works with no backend dependency. */
+
 function exportReportAsPdf(report: ReportResponseDto) {
   const scopeColor: Record<string, string> = {
     OPERATIONAL: '#1d4ed8', FINANCIAL: '#7c3aed', OCCUPANCY: '#0d9488',

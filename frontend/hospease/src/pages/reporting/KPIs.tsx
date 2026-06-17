@@ -90,11 +90,39 @@ export default function KPIs() {
   // delete
   const deleteMutation = useMutation({
     mutationFn: (id: string) => kpisApi.delete(id),
+    // Optimistic update: remove the row from the in-memory cache IMMEDIATELY
+    // before the network call returns. If the API call fails, we restore the
+    // previous list inside onError. This makes the UI feel instant and
+    // bypasses any refetch-timing issues with invalidateQueries.
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ['kpis'] });
+      const previous = queryClient.getQueryData<KPIResponseDto[]>(['kpis']) ?? [];
+      queryClient.setQueryData<KPIResponseDto[]>(
+        ['kpis'],
+        previous.filter((k) => String(k.kpiId) !== String(id)),
+      );
+      return { previous };
+    },
     onSuccess: () => {
+      // Refresh from server to confirm the optimistic update matches reality.
       queryClient.invalidateQueries({ queryKey: ['kpis'] });
       addToast('KPI deleted.', 'success');
     },
-    onError: () => addToast('Failed to delete KPI.', 'error'),
+    onError: (err: unknown, _id, ctx) => {
+      // Roll back the optimistic removal — restore the row that was hidden.
+      if (ctx?.previous) {
+        queryClient.setQueryData<KPIResponseDto[]>(['kpis'], ctx.previous);
+      }
+      const ax = err as { response?: { status?: number; data?: { message?: string } } };
+      const status = ax?.response?.status;
+      const msg = ax?.response?.data?.message;
+      let display: string;
+      if (status === 403) display = `Forbidden: your role can't delete KPIs. (${msg ?? 'no detail'})`;
+      else if (status === 404) display = 'KPI not found — it may have already been deleted.';
+      else if (status === 409) display = msg ?? 'KPI is referenced by an existing report and cannot be deleted.';
+      else display = msg ?? 'Failed to delete KPI.';
+      addToast(display, 'error');
+    },
   });
 
   // calculate

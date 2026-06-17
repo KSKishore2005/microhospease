@@ -62,7 +62,7 @@ public class ReportController {
         return ResponseEntity.status(HttpStatus.CREATED).body(reportService.createReport(dto));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping ("/{id}")
     @RoleRequired({"MANAGER", "ADMINISTRATOR", "AUDITOR"})
     public ResponseEntity<ReportResponseDto> updateReport(
             @PathVariable Long id, @Valid @RequestBody ReportRequestDto dto) {
@@ -70,7 +70,7 @@ public class ReportController {
     }
 
     @DeleteMapping("/{id}")
-    @RoleRequired({"ADMINISTRATOR"})
+    @RoleRequired({"ADMINISTRATOR", "AUDITOR"})
     public ResponseEntity<Void> deleteReport(@PathVariable Long id) {
         reportService.deleteReport(id);
         return ResponseEntity.noContent().build();

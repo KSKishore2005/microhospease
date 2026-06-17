@@ -69,7 +69,7 @@ public class AuditPackageController {
     }
 
     @DeleteMapping("/{id}")
-    @RoleRequired({"ADMINISTRATOR"})
+    @RoleRequired({"ADMINISTRATOR", "AUDITOR"})
     public ResponseEntity<Void> deletePackage(@PathVariable Long id) {
         auditPackageService.deletePackage(id);
         return ResponseEntity.noContent().build();
